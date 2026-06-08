@@ -145,7 +145,7 @@ function mapPayout(p: DbPayout): Payout {
 }
 
 function normalizeFee(
-  raw: Partial<RecurringFee> & Record<string, unknown>,
+  raw: Partial<RecurringFee>,
   recurring: boolean,
 ): PerLoadFee | RecurringFee {
   const type = VALID_FEE_TYPE.has(raw.type as PerLoadFee['type'])
@@ -213,8 +213,8 @@ export async function createTrucker(input: TruckerInput): Promise<Trucker> {
       truckNumber: str(input.truckNumber),
       notes: str(input.notes),
       commissionPercent: Math.max(0, Math.min(100, num(input.commissionPercent))),
-      perLoadFees: (input.perLoadFees ?? []).map((f) => normalizeFee(f, false)),
-      recurringFees: (input.recurringFees ?? []).map((f) => normalizeFee(f, true)),
+      perLoadFees: (input.perLoadFees ?? []).map((f) => normalizeFee(f, false)) as unknown as object,
+      recurringFees: (input.recurringFees ?? []).map((f) => normalizeFee(f, true)) as unknown as object,
     },
   });
   return mapTrucker(t);
@@ -234,10 +234,10 @@ export async function updateTrucker(id: string, input: TruckerInput): Promise<Tr
     data.commissionPercent = Math.max(0, Math.min(100, num(input.commissionPercent)));
   }
   if (input.perLoadFees !== undefined) {
-    data.perLoadFees = input.perLoadFees.map((f) => normalizeFee(f, false));
+    data.perLoadFees = input.perLoadFees.map((f) => normalizeFee(f, false)) as unknown as object;
   }
   if (input.recurringFees !== undefined) {
-    data.recurringFees = input.recurringFees.map((f) => normalizeFee(f, true));
+    data.recurringFees = input.recurringFees.map((f) => normalizeFee(f, true)) as unknown as object;
   }
 
   const t = await prisma.trucker.update({ where: { id }, data });
@@ -300,8 +300,8 @@ export async function createLoad(input: LoadInput): Promise<Load> {
       paid: !!input.paid,
       cancelled: !!input.cancelled,
       cancellationReason: str(input.cancellationReason),
-      documents: [],
-      payoutSnapshot: snapshot ?? undefined,
+      documents: [] as unknown as object,
+      payoutSnapshot: (snapshot ?? undefined) as unknown as object | undefined,
     },
   });
   return mapLoad(l);
