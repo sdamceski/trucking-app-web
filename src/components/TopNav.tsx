@@ -7,6 +7,7 @@ import type { Role } from '@prisma/client';
 const adminItems = [
   { href: '/loads', label: 'Loads' },
   { href: '/truckers', label: 'Truckers' },
+  { href: '/users', label: 'Users' },
   { href: '/reports', label: 'Reports' },
 ] as const;
 
