@@ -36,6 +36,7 @@
   "loads": [
     {
       "id": "LOAD-DCB84F",
+      "status": "delivered",
       "pickupDate": "2026-06-05",
       "deliveryDate": "2026-06-07",
       "truckerId": "TRK-DC50D4",
@@ -48,13 +49,11 @@
       "margin": 250,
       "reference": "BOL-42",
       "notes": "Edited from detail page test",
-      "createdAt": "2026-06-06T19:00:45.521Z",
-      "status": "assigned",
-      "documents": [],
       "invoiced": true,
-      "paid": true,
+      "paid": false,
       "cancelled": false,
       "cancellationReason": "",
+      "documents": [],
       "payoutSnapshot": {
         "truckerId": "TRK-DC50D4",
         "commissionPercent": 10,
@@ -67,10 +66,12 @@
           }
         ],
         "capturedAt": "2026-06-06T20:07:44.566Z"
-      }
+      },
+      "createdAt": "2026-06-06T19:00:45.521Z"
     },
     {
       "id": "LOAD-F21394",
+      "status": "new",
       "pickupDate": "2026-06-06",
       "deliveryDate": "",
       "truckerId": "TRK-DC50D4",
@@ -83,14 +84,13 @@
       "margin": 100,
       "reference": "",
       "notes": "",
-      "createdAt": "2026-06-06T19:01:39.051Z",
-      "status": "new",
-      "documents": [],
       "invoiced": false,
       "paid": false,
       "cancelled": false,
       "cancellationReason": "",
-      "payoutSnapshot": null
+      "documents": [],
+      "payoutSnapshot": null,
+      "createdAt": "2026-06-06T19:01:39.051Z"
     },
     {
       "id": "LOAD-74BBE4",
@@ -107,13 +107,13 @@
       "margin": 200,
       "reference": "",
       "notes": "",
-      "documents": [],
-      "createdAt": "2026-06-06T19:24:55.364Z",
       "invoiced": false,
       "paid": false,
       "cancelled": false,
       "cancellationReason": "",
-      "payoutSnapshot": null
+      "documents": [],
+      "payoutSnapshot": null,
+      "createdAt": "2026-06-06T19:24:55.364Z"
     }
   ]
 }

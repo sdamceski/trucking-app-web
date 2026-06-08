@@ -1,5 +1,8 @@
+import Link from 'next/link';
 import { getLoads, getTruckers } from '@/lib/store';
-import { LOAD_STATUSES, LoadStatus } from '@/lib/types';
+import { LOAD_STATUSES, Load, LoadStatus } from '@/lib/types';
+import NewLoadButton from '@/components/NewLoadButton';
+import LoadsFilters from '@/components/LoadsFilters';
 
 const STATUS_LABEL: Record<LoadStatus, string> = {
   new: 'New',
@@ -21,9 +24,56 @@ const money = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 0,
 });
 
-export default async function LoadsPage() {
-  const [loads, truckers] = await Promise.all([getLoads(), getTruckers()]);
-  const truckerName = (id: string) => truckers.find((t) => t.id === id)?.name ?? '— unassigned —';
+function applyFilters(loads: Load[], sp: Record<string, string | undefined>): Load[] {
+  return loads.filter((l) => {
+    if (sp.status && !(LOAD_STATUSES as readonly string[]).includes(sp.status)) {
+      // ignore invalid status
+    } else if (sp.status && l.status !== sp.status) {
+      return false;
+    }
+    if (sp.trucker) {
+      if (sp.trucker === '__none') {
+        if (l.truckerId) return false;
+      } else if (l.truckerId !== sp.trucker) {
+        return false;
+      }
+    }
+    if (sp.from && l.pickupDate && l.pickupDate < sp.from) return false;
+    if (sp.to && l.pickupDate && l.pickupDate > sp.to) return false;
+    if (sp.q) {
+      const q = sp.q.toLowerCase();
+      const hay = [
+        l.id,
+        l.reference,
+        l.originCompany,
+        l.originAddress,
+        l.destinationCompany,
+        l.destinationAddress,
+        l.notes,
+      ]
+        .join(' ')
+        .toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+export default async function LoadsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const flat: Record<string, string | undefined> = {};
+  for (const [k, v] of Object.entries(sp)) {
+    flat[k] = Array.isArray(v) ? v[0] : v;
+  }
+
+  const [allLoads, truckers] = await Promise.all([getLoads(), getTruckers()]);
+  const loads = applyFilters(allLoads, flat);
+  const truckerName = (id: string) =>
+    truckers.find((t) => t.id === id)?.name ?? '— unassigned —';
 
   const totalPrice = loads.reduce((s, l) => s + (l.loadPrice || 0), 0);
   const totalRate = loads.reduce((s, l) => s + (l.truckerRate || 0), 0);
@@ -34,64 +84,64 @@ export default async function LoadsPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Loads</h1>
           <p className="text-sm text-slate-500">
-            {loads.length} total · {money.format(totalPrice)} booked · {money.format(totalRate)} payouts
+            {loads.length} of {allLoads.length} · {money.format(totalPrice)} booked ·{' '}
+            {money.format(totalRate)} payouts
           </p>
         </div>
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800"
-        >
-          + New load
-        </button>
+        <NewLoadButton truckers={truckers} />
       </div>
+
+      <LoadsFilters truckers={truckers} activeCount={loads.length} />
 
       {/* Mobile: card list */}
       <ul className="space-y-3 md:hidden">
         {loads.map((l) => (
-          <li
-            key={l.id}
-            className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="font-medium">{l.reference || l.id}</div>
-                <div className="mt-0.5 text-xs text-slate-500">{l.id}</div>
-              </div>
-              <span
-                className={
-                  'rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ' +
-                  STATUS_PILL[l.status]
-                }
-              >
-                {STATUS_LABEL[l.status]}
-              </span>
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <div className="text-xs uppercase tracking-wide text-slate-400">Origin</div>
-                <div>{l.originCompany || '—'}</div>
-              </div>
-              <div>
-                <div className="text-xs uppercase tracking-wide text-slate-400">Destination</div>
-                <div>{l.destinationCompany || '—'}</div>
-              </div>
-              <div>
-                <div className="text-xs uppercase tracking-wide text-slate-400">Trucker</div>
-                <div>{truckerName(l.truckerId)}</div>
-              </div>
-              <div>
-                <div className="text-xs uppercase tracking-wide text-slate-400">Price / Rate</div>
+          <li key={l.id}>
+            <Link
+              href={`/loads/${l.id}`}
+              className="block rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition active:bg-slate-50"
+            >
+              <div className="flex items-start justify-between gap-3">
                 <div>
-                  {money.format(l.loadPrice)} <span className="text-slate-400">/</span>{' '}
-                  {money.format(l.truckerRate)}
+                  <div className="font-medium">{l.reference || l.id}</div>
+                  <div className="mt-0.5 text-xs text-slate-500">{l.id}</div>
+                </div>
+                <span
+                  className={
+                    'rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ' +
+                    STATUS_PILL[l.status]
+                  }
+                >
+                  {STATUS_LABEL[l.status]}
+                </span>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <div className="text-xs uppercase tracking-wide text-slate-400">Origin</div>
+                  <div>{l.originCompany || '—'}</div>
+                </div>
+                <div>
+                  <div className="text-xs uppercase tracking-wide text-slate-400">Destination</div>
+                  <div>{l.destinationCompany || '—'}</div>
+                </div>
+                <div>
+                  <div className="text-xs uppercase tracking-wide text-slate-400">Trucker</div>
+                  <div>{truckerName(l.truckerId)}</div>
+                </div>
+                <div>
+                  <div className="text-xs uppercase tracking-wide text-slate-400">Price / Rate</div>
+                  <div>
+                    {money.format(l.loadPrice)} <span className="text-slate-400">/</span>{' '}
+                    {money.format(l.truckerRate)}
+                  </div>
                 </div>
               </div>
-            </div>
+            </Link>
           </li>
         ))}
         {loads.length === 0 && (
           <li className="rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
-            No loads yet.
+            No loads match.
           </li>
         )}
       </ul>
@@ -109,6 +159,7 @@ export default async function LoadsPage() {
                 <th className="px-4 py-2 text-left font-medium">Status</th>
                 <th className="px-4 py-2 text-right font-medium">Load price</th>
                 <th className="px-4 py-2 text-right font-medium">Trucker rate</th>
+                <th className="px-4 py-2" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -133,12 +184,20 @@ export default async function LoadsPage() {
                   </td>
                   <td className="px-4 py-2 text-right tabular-nums">{money.format(l.loadPrice)}</td>
                   <td className="px-4 py-2 text-right tabular-nums">{money.format(l.truckerRate)}</td>
+                  <td className="px-4 py-2 text-right">
+                    <Link
+                      href={`/loads/${l.id}`}
+                      className="text-sm font-medium text-slate-700 hover:text-slate-900 hover:underline"
+                    >
+                      Open
+                    </Link>
+                  </td>
                 </tr>
               ))}
               {loads.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
-                    No loads yet.
+                  <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
+                    No loads match.
                   </td>
                 </tr>
               )}
@@ -146,10 +205,6 @@ export default async function LoadsPage() {
           </table>
         </div>
       </div>
-
-      <p className="text-xs text-slate-400">
-        Available statuses: {LOAD_STATUSES.join(' · ')}
-      </p>
     </div>
   );
 }

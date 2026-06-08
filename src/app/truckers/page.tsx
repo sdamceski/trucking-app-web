@@ -1,4 +1,6 @@
+import Link from 'next/link';
 import { getTruckers } from '@/lib/store';
+import NewTruckerButton from '@/components/NewTruckerButton';
 
 export default async function TruckersPage() {
   const truckers = await getTruckers();
@@ -9,40 +11,40 @@ export default async function TruckersPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Truckers</h1>
           <p className="text-sm text-slate-500">{truckers.length} on file</p>
         </div>
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800"
-        >
-          + New trucker
-        </button>
+        <NewTruckerButton />
       </div>
 
       {/* Mobile cards */}
       <ul className="space-y-3 md:hidden">
         {truckers.map((t) => (
-          <li key={t.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="font-medium">{t.name}</div>
-                <div className="text-xs text-slate-500">{t.id}</div>
+          <li key={t.id}>
+            <Link
+              href={`/truckers/${t.id}`}
+              className="block rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition active:bg-slate-50"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="font-medium">{t.name}</div>
+                  <div className="text-xs text-slate-500">{t.id}</div>
+                </div>
+                <div className="text-right text-sm text-slate-600">
+                  <div>Truck {t.truckNumber || '—'}</div>
+                  <div className="text-xs text-slate-500">{t.commissionPercent}% commission</div>
+                </div>
               </div>
-              <div className="text-right text-sm text-slate-600">
-                <div>Truck {t.truckNumber || '—'}</div>
-                <div className="text-xs text-slate-500">{t.commissionPercent}% commission</div>
-              </div>
-            </div>
-            {(t.phone || t.email) && (
-              <div className="mt-2 text-xs text-slate-500">
-                {t.phone}
-                {t.phone && t.email ? ' · ' : ''}
-                {t.email}
-              </div>
-            )}
+              {(t.phone || t.email) && (
+                <div className="mt-2 text-xs text-slate-500">
+                  {t.phone}
+                  {t.phone && t.email ? ' · ' : ''}
+                  {t.email}
+                </div>
+              )}
+            </Link>
           </li>
         ))}
         {truckers.length === 0 && (
           <li className="rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
-            No truckers yet.
+            No truckers yet. Tap “+ New trucker” to add one.
           </li>
         )}
       </ul>
@@ -58,6 +60,7 @@ export default async function TruckersPage() {
                 <th className="px-4 py-2 text-left font-medium">Phone</th>
                 <th className="px-4 py-2 text-left font-medium">Email</th>
                 <th className="px-4 py-2 text-right font-medium">Commission</th>
+                <th className="px-4 py-2" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -71,11 +74,19 @@ export default async function TruckersPage() {
                   <td className="px-4 py-2">{t.phone || '—'}</td>
                   <td className="px-4 py-2">{t.email || '—'}</td>
                   <td className="px-4 py-2 text-right tabular-nums">{t.commissionPercent}%</td>
+                  <td className="px-4 py-2 text-right">
+                    <Link
+                      href={`/truckers/${t.id}`}
+                      className="text-sm font-medium text-slate-700 hover:text-slate-900 hover:underline"
+                    >
+                      Open
+                    </Link>
+                  </td>
                 </tr>
               ))}
               {truckers.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
                     No truckers yet.
                   </td>
                 </tr>

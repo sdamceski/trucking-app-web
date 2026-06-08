@@ -6,6 +6,7 @@ export type LoadFlag = (typeof LOAD_FLAGS)[number];
 
 export const FEE_TYPES = ['fixed', 'percent'] as const;
 export type FeeType = (typeof FEE_TYPES)[number];
+export const VALID_FEE_TYPE = new Set<FeeType>(FEE_TYPES);
 
 export const RECURRING_FREQUENCIES = [
   'weekly',
