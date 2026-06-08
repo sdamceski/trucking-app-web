@@ -1,0 +1,119 @@
+{
+  "truckers": [
+    {
+      "id": "TRK-25DAB8",
+      "name": "Sale",
+      "phone": "6145211445",
+      "email": "daskkdos@dkosdk.com",
+      "truckNumber": "4455",
+      "notes": "",
+      "createdAt": "2026-06-06T18:16:19.444Z",
+      "commissionPercent": 10,
+      "perLoadFees": [],
+      "recurringFees": []
+    },
+    {
+      "id": "TRK-DC50D4",
+      "name": "John Driver",
+      "phone": "",
+      "email": "",
+      "truckNumber": "T-101",
+      "notes": "",
+      "createdAt": "2026-06-06T19:00:45.447Z",
+      "commissionPercent": 10,
+      "perLoadFees": [],
+      "recurringFees": [
+        {
+          "id": "FEE-6173D4",
+          "name": "Weekly insurance",
+          "type": "fixed",
+          "amount": 300,
+          "frequency": "weekly"
+        }
+      ]
+    }
+  ],
+  "loads": [
+    {
+      "id": "LOAD-DCB84F",
+      "pickupDate": "2026-06-05",
+      "deliveryDate": "2026-06-07",
+      "truckerId": "TRK-DC50D4",
+      "originCompany": "ACME Logistics",
+      "originAddress": "100 Warehouse Rd, Chicago, IL 60601",
+      "destinationCompany": "Big Box Receiving",
+      "destinationAddress": "200 Dock St, Dallas, TX 75201",
+      "loadPrice": 1250,
+      "truckerRate": 1000,
+      "margin": 250,
+      "reference": "BOL-42",
+      "notes": "Edited from detail page test",
+      "createdAt": "2026-06-06T19:00:45.521Z",
+      "status": "assigned",
+      "documents": [],
+      "invoiced": true,
+      "paid": true,
+      "cancelled": false,
+      "cancellationReason": "",
+      "payoutSnapshot": {
+        "truckerId": "TRK-DC50D4",
+        "commissionPercent": 10,
+        "perLoadFees": [
+          {
+            "id": "FEE-4DCFA5",
+            "name": "Insurance",
+            "type": "fixed",
+            "amount": 300
+          }
+        ],
+        "capturedAt": "2026-06-06T20:07:44.566Z"
+      }
+    },
+    {
+      "id": "LOAD-F21394",
+      "pickupDate": "2026-06-06",
+      "deliveryDate": "",
+      "truckerId": "TRK-DC50D4",
+      "originCompany": "",
+      "originAddress": "",
+      "destinationCompany": "",
+      "destinationAddress": "",
+      "loadPrice": 1000,
+      "truckerRate": 900,
+      "margin": 100,
+      "reference": "",
+      "notes": "",
+      "createdAt": "2026-06-06T19:01:39.051Z",
+      "status": "new",
+      "documents": [],
+      "invoiced": false,
+      "paid": false,
+      "cancelled": false,
+      "cancellationReason": "",
+      "payoutSnapshot": null
+    },
+    {
+      "id": "LOAD-74BBE4",
+      "status": "new",
+      "pickupDate": "2026-06-11",
+      "deliveryDate": "",
+      "truckerId": "",
+      "originCompany": "",
+      "originAddress": "",
+      "destinationCompany": "",
+      "destinationAddress": "",
+      "loadPrice": 900,
+      "truckerRate": 700,
+      "margin": 200,
+      "reference": "",
+      "notes": "",
+      "documents": [],
+      "createdAt": "2026-06-06T19:24:55.364Z",
+      "invoiced": false,
+      "paid": false,
+      "cancelled": false,
+      "cancellationReason": "",
+      "payoutSnapshot": null
+    }
+  ]
+}
