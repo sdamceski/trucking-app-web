@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
 import { logout } from '@/lib/actions/auth';
 import type { Role } from '@prisma/client';
 
@@ -42,10 +43,17 @@ export default function UserMenu({ email, role }: { email: string; role: Role })
             <div className="truncate text-sm font-medium text-slate-900">{email}</div>
             <div className="mt-0.5 text-xs uppercase tracking-wide text-slate-500">{role}</div>
           </div>
+          <Link
+            href="/profile"
+            onClick={() => setOpen(false)}
+            className="block px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50"
+          >
+            Profile &amp; password
+          </Link>
           <form action={logout}>
             <button
               type="submit"
-              className="block w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50"
+              className="block w-full border-t border-slate-100 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50"
             >
               Sign out
             </button>
