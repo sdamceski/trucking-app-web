@@ -91,8 +91,8 @@ function mapLoad(l: DbLoad): Load {
     paid: l.paid,
     cancelled: l.cancelled,
     cancellationReason: l.cancellationReason,
-    documents: Array.isArray(l.documents) ? (l.documents as Load['documents']) : [],
-    payoutSnapshot: (l.payoutSnapshot as Load['payoutSnapshot']) ?? null,
+    documents: Array.isArray(l.documents) ? (l.documents as unknown as Load['documents']) : [],
+    payoutSnapshot: (l.payoutSnapshot as unknown as Load['payoutSnapshot']) ?? null,
     payoutId: l.payoutId ?? '',
     createdAt: l.createdAt.toISOString(),
   };
