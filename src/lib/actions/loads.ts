@@ -5,12 +5,15 @@ import { redirect } from 'next/navigation';
 import {
   createLoad as storeCreateLoad,
   deleteLoad as storeDeleteLoad,
+  getLoad,
   updateLoad as storeUpdateLoad,
 } from '@/lib/store';
 import { LOAD_STATUSES } from '@/lib/types';
 import type { LoadStatus } from '@/lib/types';
+import { requireAdmin, requireTrucker } from '@/lib/auth/dal';
 
 const VALID_STATUS = new Set<string>(LOAD_STATUSES);
+const TRUCKER_ALLOWED_STATUS = new Set<LoadStatus>(['picked_up', 'delivered']);
 
 function s(v: FormDataEntryValue | null): string {
   return typeof v === 'string' ? v.trim() : '';
@@ -42,6 +45,7 @@ function loadFromForm(fd: FormData) {
 }
 
 export async function createLoad(fd: FormData) {
+  await requireAdmin();
   const input = loadFromForm(fd);
   if (!input.pickupDate) {
     throw new Error('Pickup date is required');
@@ -53,6 +57,7 @@ export async function createLoad(fd: FormData) {
 }
 
 export async function updateLoad(id: string, fd: FormData) {
+  await requireAdmin();
   const input = loadFromForm(fd);
   // Booleans aren't coming through (no checkboxes in the main form);
   // flag/cancel actions have dedicated server actions below.
@@ -63,11 +68,26 @@ export async function updateLoad(id: string, fd: FormData) {
 }
 
 export async function setLoadStatus(id: string, status: LoadStatus) {
+  await requireAdmin();
   if (!VALID_STATUS.has(status)) throw new Error('Invalid status');
   await storeUpdateLoad(id, { status });
   revalidatePath('/loads');
   revalidatePath('/reports');
   revalidatePath(`/loads/${id}`);
+}
+
+export async function setMyLoadStatus(id: string, status: LoadStatus) {
+  const session = await requireTrucker();
+  if (!TRUCKER_ALLOWED_STATUS.has(status)) {
+    throw new Error('Truckers can only set status to picked up or delivered');
+  }
+  const load = await getLoad(id);
+  if (!load || load.truckerId !== session.truckerId) {
+    throw new Error('Load not found');
+  }
+  await storeUpdateLoad(id, { status });
+  revalidatePath('/my');
+  revalidatePath(`/my/loads/${id}`);
 }
 
 export async function toggleFlag(
@@ -76,6 +96,7 @@ export async function toggleFlag(
   value: boolean,
   cancellationReason?: string,
 ) {
+  await requireAdmin();
   const patch: Record<string, unknown> = { [flag]: value };
   if (flag === 'cancelled') {
     patch.cancellationReason = value ? (cancellationReason ?? '').trim() : '';
@@ -87,6 +108,7 @@ export async function toggleFlag(
 }
 
 export async function setInvoiced(id: string, date: string, note: string) {
+  await requireAdmin();
   await storeUpdateLoad(id, {
     invoiced: true,
     invoicedAt: (date || '').trim(),
@@ -98,6 +120,7 @@ export async function setInvoiced(id: string, date: string, note: string) {
 }
 
 export async function clearInvoiced(id: string) {
+  await requireAdmin();
   await storeUpdateLoad(id, { invoiced: false, invoicedAt: '', invoicedNote: '' });
   revalidatePath('/loads');
   revalidatePath('/reports');
@@ -105,6 +128,7 @@ export async function clearInvoiced(id: string) {
 }
 
 export async function deleteLoad(id: string) {
+  await requireAdmin();
   await storeDeleteLoad(id);
   revalidatePath('/loads');
   revalidatePath('/reports');

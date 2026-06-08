@@ -2,15 +2,22 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import type { Role } from '@prisma/client';
 
-const items = [
+const adminItems = [
   { href: '/loads', label: 'Loads' },
   { href: '/truckers', label: 'Truckers' },
   { href: '/reports', label: 'Reports' },
 ] as const;
 
-export default function TopNav() {
+const truckerItems = [
+  { href: '/my', label: 'My loads' },
+  { href: '/my/payouts', label: 'My payouts' },
+] as const;
+
+export default function TopNav({ role }: { role: Role }) {
   const pathname = usePathname();
+  const items = role === 'admin' ? adminItems : truckerItems;
   return (
     <nav className="hidden md:block">
       <ul className="flex items-center gap-1">

@@ -9,6 +9,8 @@ import {
 } from '@/components/TruckerDetailParts';
 import LoadsFilters from '@/components/LoadsFilters';
 import LoadsList, { applyLoadFilters } from '@/components/LoadsList';
+import InvitePasswordBanner from '@/components/InvitePasswordBanner';
+import ResetPasswordButton from '@/components/ResetPasswordButton';
 
 const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 const dt = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' });
@@ -60,6 +62,9 @@ export default async function TruckerDetailPage({
 
   return (
     <div className="space-y-6">
+      {flat.invited && trucker.email ? (
+        <InvitePasswordBanner password={flat.invited} email={trucker.email} />
+      ) : null}
       {/* Header */}
       <div className="space-y-3">
         <Link
@@ -117,9 +122,12 @@ export default async function TruckerDetailPage({
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Profile */}
           <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-              Profile
-            </h2>
+            <div className="flex items-start justify-between gap-3">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                Profile
+              </h2>
+              {trucker.email ? <ResetPasswordButton truckerId={trucker.id} /> : null}
+            </div>
             <TruckerProfileForm trucker={trucker} />
           </section>
 

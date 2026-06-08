@@ -19,6 +19,23 @@ enum LoadStatus {
   delivered
 }
 
+enum Role {
+  admin
+  trucker
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(trucker)
+  truckerId    String?  @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  trucker Trucker? @relation(fields: [truckerId], references: [id], onDelete: SetNull)
+}
+
 model Trucker {
   id                String   @id
   name              String
@@ -34,6 +51,7 @@ model Trucker {
 
   loads   Load[]
   payouts Payout[]
+  user    User?
 }
 
 model Load {

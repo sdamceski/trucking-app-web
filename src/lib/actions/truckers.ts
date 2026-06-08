@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import bcrypt from 'bcryptjs';
 import {
   createTrucker as storeCreateTrucker,
   deleteTrucker as storeDeleteTrucker,
@@ -9,6 +10,8 @@ import {
   updateTrucker as storeUpdateTrucker,
 } from '@/lib/store';
 import { newId } from '@/lib/ids';
+import { prisma } from '@/lib/prisma';
+import { requireAdmin } from '@/lib/auth/dal';
 import { RECURRING_FREQUENCIES } from '@/lib/types';
 import type { PerLoadFee, RecurringFee, RecurringFrequency } from '@/lib/types';
 
@@ -32,16 +35,44 @@ function profileFromForm(fd: FormData) {
 }
 
 export async function createTrucker(fd: FormData) {
+  await requireAdmin();
   const input = profileFromForm(fd);
   if (!input.name) {
     throw new Error('Name is required');
   }
   const created = await storeCreateTrucker(input);
+
+  // If admin provided an email, also provision a login account.
+  let tempPassword = '';
+  const email = input.email.toLowerCase();
+  if (email) {
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (!existing) {
+      tempPassword = generateTempPassword();
+      const passwordHash = await bcrypt.hash(tempPassword, 10);
+      await prisma.user.create({
+        data: { email, passwordHash, role: 'trucker', truckerId: created.id },
+      });
+    }
+  }
+
   revalidatePath('/truckers');
-  redirect(`/truckers/${created.id}`);
+  redirect(
+    tempPassword
+      ? `/truckers/${created.id}?invited=${encodeURIComponent(tempPassword)}`
+      : `/truckers/${created.id}`,
+  );
+}
+
+function generateTempPassword(): string {
+  // 10-char URL-safe random string (~60 bits of entropy).
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  return Buffer.from(bytes).toString('base64url');
 }
 
 export async function updateTruckerProfile(id: string, fd: FormData) {
+  await requireAdmin();
   const input = profileFromForm(fd);
   if (!input.name) {
     throw new Error('Name is required');
@@ -52,15 +83,33 @@ export async function updateTruckerProfile(id: string, fd: FormData) {
 }
 
 export async function deleteTrucker(id: string) {
+  await requireAdmin();
   await storeDeleteTrucker(id);
   revalidatePath('/truckers');
   revalidatePath('/loads');
   redirect('/truckers');
 }
 
+export async function resetTruckerPassword(truckerId: string): Promise<{ password: string }> {
+  await requireAdmin();
+  const trucker = await getTrucker(truckerId);
+  if (!trucker) throw new Error('Trucker not found');
+  const email = trucker.email.toLowerCase();
+  if (!email) throw new Error('Trucker has no email on file');
+  const password = generateTempPassword();
+  const passwordHash = await bcrypt.hash(password, 10);
+  await prisma.user.upsert({
+    where: { email },
+    update: { passwordHash, role: 'trucker', truckerId },
+    create: { email, passwordHash, role: 'trucker', truckerId },
+  });
+  return { password };
+}
+
 // ---- Fees ----
 
 export async function addPerLoadFee(truckerId: string, fd: FormData) {
+  await requireAdmin();
   const trucker = await getTrucker(truckerId);
   if (!trucker) throw new Error('Trucker not found');
   const fee: PerLoadFee = {
@@ -74,6 +123,7 @@ export async function addPerLoadFee(truckerId: string, fd: FormData) {
 }
 
 export async function removePerLoadFee(truckerId: string, feeId: string) {
+  await requireAdmin();
   const trucker = await getTrucker(truckerId);
   if (!trucker) throw new Error('Trucker not found');
   await storeUpdateTrucker(truckerId, {
@@ -83,6 +133,7 @@ export async function removePerLoadFee(truckerId: string, feeId: string) {
 }
 
 export async function addRecurringFee(truckerId: string, fd: FormData) {
+  await requireAdmin();
   const trucker = await getTrucker(truckerId);
   if (!trucker) throw new Error('Trucker not found');
   const freqRaw = s(fd.get('frequency'));
@@ -103,6 +154,7 @@ export async function addRecurringFee(truckerId: string, fd: FormData) {
 }
 
 export async function removeRecurringFee(truckerId: string, feeId: string) {
+  await requireAdmin();
   const trucker = await getTrucker(truckerId);
   if (!trucker) throw new Error('Trucker not found');
   await storeUpdateTrucker(truckerId, {

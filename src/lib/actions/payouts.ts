@@ -6,6 +6,7 @@ import {
   createPayout as storeCreatePayout,
   voidPayout as storeVoidPayout,
 } from '@/lib/store';
+import { requireAdmin } from '@/lib/auth/dal';
 
 function s(v: FormDataEntryValue | null): string {
   return typeof v === 'string' ? v.trim() : '';
@@ -16,6 +17,7 @@ function n(v: FormDataEntryValue | null): number {
 }
 
 export async function createPayout(truckerId: string, fd: FormData): Promise<void> {
+  await requireAdmin();
   const loadIds = fd.getAll('loadIds').filter((v): v is string => typeof v === 'string');
   const recurringIds = fd
     .getAll('recurringIds')
@@ -45,6 +47,7 @@ export async function createPayout(truckerId: string, fd: FormData): Promise<voi
 }
 
 export async function voidPayout(id: string, truckerId: string): Promise<void> {
+  await requireAdmin();
   await storeVoidPayout(id);
   revalidatePath(`/truckers/${truckerId}`);
   revalidatePath('/loads');
