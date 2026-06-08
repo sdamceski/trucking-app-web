@@ -4,11 +4,16 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
+import { createTrucker as storeCreateTrucker } from '@/lib/store';
 import { requireAdmin } from '@/lib/auth/dal';
 import type { Role } from '@prisma/client';
 
 function s(v: FormDataEntryValue | null): string {
   return typeof v === 'string' ? v.trim() : '';
+}
+function n(v: FormDataEntryValue | null): number {
+  const x = Number(v);
+  return Number.isFinite(x) ? x : 0;
 }
 
 function generateTempPassword(): string {
@@ -25,37 +30,48 @@ export async function createUser(fd: FormData): Promise<void> {
   await requireAdmin();
   const email = s(fd.get('email')).toLowerCase();
   const role = parseRole(s(fd.get('role')));
-  const truckerId = s(fd.get('truckerId')) || null;
+  const truckerMode = s(fd.get('truckerMode')); // 'existing' | 'new'
+  let truckerId: string | null = s(fd.get('truckerId')) || null;
 
   if (!email || !email.includes('@')) {
     throw new Error('A valid email address is required.');
-  }
-  if (role === 'trucker' && !truckerId) {
-    throw new Error('Select a trucker to link this user to.');
   }
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) throw new Error('A user with that email already exists.');
 
-  if (truckerId) {
-    const trucker = await prisma.trucker.findUnique({
-      where: { id: truckerId },
-      include: { user: { select: { id: true } } },
-    });
-    if (!trucker) throw new Error('Trucker not found.');
-    if (trucker.user) throw new Error('That trucker is already linked to another user.');
+  if (role === 'trucker') {
+    if (truckerMode === 'new') {
+      const name = s(fd.get('newTruckerName'));
+      if (!name) throw new Error('Trucker name is required.');
+      const created = await storeCreateTrucker({
+        name,
+        phone: s(fd.get('newTruckerPhone')),
+        email: s(fd.get('newTruckerEmail')) || email,
+        truckNumber: s(fd.get('newTruckerTruckNumber')),
+        notes: s(fd.get('newTruckerNotes')),
+        commissionPercent: n(fd.get('newTruckerCommissionPercent')),
+      });
+      truckerId = created.id;
+      revalidatePath('/truckers');
+    } else {
+      if (!truckerId) throw new Error('Select a trucker to link this user to.');
+      const trucker = await prisma.trucker.findUnique({
+        where: { id: truckerId },
+        include: { user: { select: { id: true } } },
+      });
+      if (!trucker) throw new Error('Trucker not found.');
+      if (trucker.user) throw new Error('That trucker is already linked to another user.');
+    }
+  } else {
+    truckerId = null;
   }
 
   const tempPassword = generateTempPassword();
   const passwordHash = await bcrypt.hash(tempPassword, 10);
 
   const created = await prisma.user.create({
-    data: {
-      email,
-      passwordHash,
-      role,
-      truckerId: role === 'trucker' ? truckerId : null,
-    },
+    data: { email, passwordHash, role, truckerId },
   });
 
   revalidatePath('/users');

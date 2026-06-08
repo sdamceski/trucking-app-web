@@ -10,6 +10,9 @@ export type TruckerOption = { id: string; name: string };
 export default function NewUserButton({ truckers }: { truckers: TruckerOption[] }) {
   const [open, setOpen] = useState(false);
   const [role, setRole] = useState<'admin' | 'trucker'>('admin');
+  const [truckerMode, setTruckerMode] = useState<'existing' | 'new'>(
+    truckers.length === 0 ? 'new' : 'existing',
+  );
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -93,26 +96,96 @@ export default function NewUserButton({ truckers }: { truckers: TruckerOption[] 
           </Field>
 
           {role === 'trucker' ? (
-            <Field
-              label="Linked trucker"
-              hint="The user will only see loads and payouts for this trucker."
-            >
-              <select name="truckerId" required className={inputCx} defaultValue="">
-                <option value="" disabled>
-                  Select a trucker…
-                </option>
-                {truckers.length === 0 ? (
-                  <option value="" disabled>
-                    No unlinked truckers — create one first.
-                  </option>
-                ) : null}
-                {truckers.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
+            <div className="space-y-4 rounded-md border border-slate-200 bg-slate-50 p-3">
+              <input type="hidden" name="truckerMode" value={truckerMode} />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTruckerMode('existing')}
+                  disabled={truckers.length === 0}
+                  className={
+                    'flex-1 rounded-md border px-3 py-1.5 text-sm font-medium ' +
+                    (truckerMode === 'existing'
+                      ? 'border-slate-900 bg-white text-slate-900'
+                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100') +
+                    (truckers.length === 0 ? ' cursor-not-allowed opacity-50' : '')
+                  }
+                >
+                  Link existing
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTruckerMode('new')}
+                  className={
+                    'flex-1 rounded-md border px-3 py-1.5 text-sm font-medium ' +
+                    (truckerMode === 'new'
+                      ? 'border-slate-900 bg-white text-slate-900'
+                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100')
+                  }
+                >
+                  Create new
+                </button>
+              </div>
+
+              {truckerMode === 'existing' ? (
+                <Field
+                  label="Linked trucker"
+                  hint="Only truckers without a login are shown."
+                >
+                  <select name="truckerId" required className={inputCx} defaultValue="">
+                    <option value="" disabled>
+                      Select a trucker…
+                    </option>
+                    {truckers.length === 0 ? (
+                      <option value="" disabled>
+                        No unlinked truckers — switch to “Create new”.
+                      </option>
+                    ) : null}
+                    {truckers.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              ) : (
+                <div className="space-y-3">
+                  <Field label="Trucker name">
+                    <input
+                      name="newTruckerName"
+                      type="text"
+                      required={truckerMode === 'new'}
+                      className={inputCx}
+                    />
+                  </Field>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Field label="Phone">
+                      <input name="newTruckerPhone" type="tel" className={inputCx} />
+                    </Field>
+                    <Field label="Truck #">
+                      <input name="newTruckerTruckNumber" type="text" className={inputCx} />
+                    </Field>
+                    <Field label="Commission %" hint="0–100">
+                      <input
+                        name="newTruckerCommissionPercent"
+                        type="number"
+                        min={0}
+                        max={100}
+                        step="0.1"
+                        defaultValue={0}
+                        className={inputCx}
+                      />
+                    </Field>
+                    <Field label="Trucker email" hint="Defaults to the login email.">
+                      <input name="newTruckerEmail" type="email" className={inputCx} />
+                    </Field>
+                  </div>
+                  <Field label="Notes">
+                    <textarea name="newTruckerNotes" rows={2} className={inputCx} />
+                  </Field>
+                </div>
+              )}
+            </div>
           ) : null}
 
           <p className="rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
