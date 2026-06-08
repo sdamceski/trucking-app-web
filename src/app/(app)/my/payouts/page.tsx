@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth/dal';
 import { prisma } from '@/lib/prisma';
@@ -16,6 +17,14 @@ export default async function MyPayoutsPage() {
   const payouts = await prisma.payout.findMany({
     where: { truckerId: user.truckerId },
     orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      periodStart: true,
+      periodEnd: true,
+      netTotal: true,
+      createdAt: true,
+      loadLines: true,
+    },
   });
 
   return (
@@ -32,50 +41,48 @@ export default async function MyPayoutsPage() {
           No payouts yet.
         </div>
       ) : (
-        <ul className="space-y-3">
-          {payouts.map((p) => (
-            <li
-              key={p.id}
-              className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="font-medium">{p.id}</div>
-                  <div className="mt-0.5 text-xs text-slate-500">
-                    {p.periodStart || '—'} → {p.periodEnd || '—'}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-lg font-semibold text-emerald-700">
-                    {money.format(p.netTotal)}
-                  </div>
-                  <div className="text-xs text-slate-500">
-                    Created {new Date(p.createdAt).toLocaleDateString()}
-                  </div>
-                </div>
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <div className="text-xs uppercase tracking-wide text-slate-400">
-                    Loads subtotal
-                  </div>
-                  <div>{money.format(p.loadsSubtotal)}</div>
-                </div>
-                <div>
-                  <div className="text-xs uppercase tracking-wide text-slate-400">
-                    Recurring
-                  </div>
-                  <div>{money.format(p.recurringTotal)}</div>
-                </div>
-              </div>
-              {p.notes ? (
-                <div className="mt-3 rounded-md bg-slate-50 p-2.5 text-sm text-slate-700">
-                  {p.notes}
-                </div>
-              ) : null}
-            </li>
-          ))}
-        </ul>
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+          <ul className="divide-y divide-slate-100">
+            {payouts.map((p) => {
+              const loadCount = Array.isArray(p.loadLines) ? p.loadLines.length : 0;
+              const period =
+                p.periodStart || p.periodEnd
+                  ? `${p.periodStart || '—'} → ${p.periodEnd || '—'}`
+                  : `Created ${new Date(p.createdAt).toLocaleDateString()}`;
+              return (
+                <li key={p.id}>
+                  <Link
+                    href={`/my/payouts/${p.id}`}
+                    className="flex items-center justify-between gap-3 px-4 py-3 transition hover:bg-slate-50 active:bg-slate-100"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate font-medium">{p.id}</div>
+                      <div className="mt-0.5 text-xs text-slate-500">
+                        {period} · {loadCount} load{loadCount === 1 ? '' : 's'}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <div className="text-base font-semibold text-emerald-700 tabular-nums">
+                          {money.format(p.netTotal)}
+                        </div>
+                      </div>
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                        className="h-4 w-4 text-slate-400"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
     </div>
   );
