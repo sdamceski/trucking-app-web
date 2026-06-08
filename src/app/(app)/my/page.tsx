@@ -6,7 +6,7 @@ import MyLoadsList from '@/components/MyLoadsList';
 
 export const metadata = { title: 'My loads' };
 
-type Filter = 'unpaid' | 'all';
+type Filter = 'open' | 'all';
 
 export default async function MyLoadsPage({
   searchParams,
@@ -18,15 +18,15 @@ export default async function MyLoadsPage({
 
   const sp = await searchParams;
   const rawShow = Array.isArray(sp.show) ? sp.show[0] : sp.show;
-  const filter: Filter = rawShow === 'all' ? 'all' : 'unpaid';
+  const filter: Filter = rawShow === 'all' ? 'all' : 'open';
 
-  const [trucker, loads, unpaidCount] = await Promise.all([
+  const [trucker, loads, openCount] = await Promise.all([
     prisma.trucker.findUnique({ where: { id: user.truckerId } }),
     prisma.load.findMany({
       where: {
         truckerId: user.truckerId,
         cancelled: false,
-        ...(filter === 'unpaid' ? { paid: false } : {}),
+        ...(filter === 'open' ? { paid: false } : {}),
       },
       orderBy: { pickupDate: 'desc' },
     }),
@@ -41,12 +41,12 @@ export default async function MyLoadsPage({
         <h1 className="text-2xl font-semibold tracking-tight">My loads</h1>
         <p className="text-sm text-slate-500">
           {trucker?.name ?? 'Hello'} · showing {loads.length} ·{' '}
-          {unpaidCount} unpaid
+          {openCount} open
         </p>
       </div>
 
       <div className="inline-flex rounded-md border border-slate-200 bg-white p-1 text-sm shadow-sm">
-        <FilterTab href="/my" label="Unpaid" active={filter === 'unpaid'} />
+        <FilterTab href="/my" label="Open" active={filter === 'open'} />
         <FilterTab href="/my?show=all" label="All" active={filter === 'all'} />
       </div>
 
@@ -65,8 +65,8 @@ export default async function MyLoadsPage({
           paid: l.paid,
         }))}
         emptyMessage={
-          filter === 'unpaid'
-            ? 'No unpaid loads. Tap “All” to see paid ones too.'
+          filter === 'open'
+            ? 'No open loads. Tap “All” to see settled ones too.'
             : 'No loads assigned to you yet.'
         }
       />
