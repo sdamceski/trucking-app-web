@@ -29,13 +29,20 @@ type MyLoad = {
   destinationAddress: string;
   reference: string;
   notes: string;
+  paid: boolean;
 };
 
-export default function MyLoadsList({ loads }: { loads: MyLoad[] }) {
+export default function MyLoadsList({
+  loads,
+  emptyMessage = 'No loads assigned to you yet.',
+}: {
+  loads: MyLoad[];
+  emptyMessage?: string;
+}) {
   if (loads.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
-        No loads assigned to you yet.
+        {emptyMessage}
       </div>
     );
   }
@@ -67,14 +74,21 @@ function LoadCard({ load }: { load: MyLoad }) {
           <div className="font-medium">{load.reference || load.id}</div>
           <div className="mt-0.5 text-xs text-slate-500">{load.id}</div>
         </div>
-        <span
-          className={
-            'rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ' +
-            STATUS_PILL[load.status]
-          }
-        >
-          {STATUS_LABEL[load.status]}
-        </span>
+        <div className="flex flex-col items-end gap-1">
+          <span
+            className={
+              'rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ' +
+              STATUS_PILL[load.status]
+            }
+          >
+            {STATUS_LABEL[load.status]}
+          </span>
+          {load.paid ? (
+            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
+              Paid
+            </span>
+          ) : null}
+        </div>
       </div>
 
       <div className="mt-3 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
