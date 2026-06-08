@@ -83,6 +83,34 @@ export default async function LoadDetailPage({
           <div className="mt-2">
             <FlagActions load={load} />
           </div>
+          {load.payoutId && (
+            <p className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+              Settled on payout{' '}
+              <Link href={`/payouts/${load.payoutId}`} className="font-medium underline">
+                {load.payoutId}
+              </Link>
+              . Void the payout to mark this load unpaid again.
+            </p>
+          )}
+          {load.invoiced && (
+            <p className="mt-3 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800">
+              <span className="font-medium">Invoiced</span>
+              {load.invoicedAt && (
+                <>
+                  {' '}on{' '}
+                  <span className="font-medium">
+                    {new Date(load.invoicedAt).toLocaleDateString()}
+                  </span>
+                </>
+              )}
+              {load.invoicedNote && (
+                <>
+                  {' — '}
+                  <span className="italic">{load.invoicedNote}</span>
+                </>
+              )}
+            </p>
+          )}
         </div>
       </section>
 

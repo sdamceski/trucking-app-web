@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { setLoadStatus, toggleFlag, deleteLoad } from '@/lib/actions/loads';
 import { Load, LoadStatus } from '@/lib/types';
 import { btnPrimary, btnSecondary, btnDanger } from './form';
+import InvoicedDialog from './InvoicedDialog';
 
 const STATUS_LABEL: Record<LoadStatus, string> = {
   new: 'New',
@@ -56,13 +57,6 @@ export function FlagActions({ load }: { load: Load }) {
   const [reason, setReason] = useState('');
   const [showReason, setShowReason] = useState(false);
 
-  function toggle(flag: 'invoiced' | 'paid', value: boolean) {
-    startTransition(async () => {
-      await toggleFlag(load.id, flag, value);
-      router.refresh();
-    });
-  }
-
   function cancel() {
     if (load.cancelled) {
       startTransition(async () => {
@@ -87,22 +81,7 @@ export function FlagActions({ load }: { load: Load }) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => toggle('invoiced', !load.invoiced)}
-          className={load.invoiced ? btnSecondary : btnPrimary}
-        >
-          {load.invoiced ? 'Unmark invoiced' : 'Mark invoiced'}
-        </button>
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => toggle('paid', !load.paid)}
-          className={load.paid ? btnSecondary : btnPrimary}
-        >
-          {load.paid ? 'Unmark paid' : 'Mark paid'}
-        </button>
+        <InvoicedDialog load={load} />
         <button type="button" disabled={pending} onClick={cancel} className={btnDanger}>
           {load.cancelled ? 'Reopen load' : showReason ? 'Confirm cancel' : 'Cancel load'}
         </button>

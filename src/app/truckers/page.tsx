@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getTruckers } from '@/lib/store';
 import NewTruckerButton from '@/components/NewTruckerButton';
+import RowLink from '@/components/RowLink';
 
 export default async function TruckersPage() {
   const truckers = await getTruckers();
@@ -60,12 +61,11 @@ export default async function TruckersPage() {
                 <th className="px-4 py-2 text-left font-medium">Phone</th>
                 <th className="px-4 py-2 text-left font-medium">Email</th>
                 <th className="px-4 py-2 text-right font-medium">Commission</th>
-                <th className="px-4 py-2" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {truckers.map((t) => (
-                <tr key={t.id} className="hover:bg-slate-50">
+                <RowLink key={t.id} href={`/truckers/${t.id}`} className="hover:bg-slate-50">
                   <td className="px-4 py-2">
                     <div className="font-medium">{t.name}</div>
                     <div className="text-xs text-slate-400">{t.id}</div>
@@ -74,19 +74,11 @@ export default async function TruckersPage() {
                   <td className="px-4 py-2">{t.phone || '—'}</td>
                   <td className="px-4 py-2">{t.email || '—'}</td>
                   <td className="px-4 py-2 text-right tabular-nums">{t.commissionPercent}%</td>
-                  <td className="px-4 py-2 text-right">
-                    <Link
-                      href={`/truckers/${t.id}`}
-                      className="text-sm font-medium text-slate-700 hover:text-slate-900 hover:underline"
-                    >
-                      Open
-                    </Link>
-                  </td>
-                </tr>
+                </RowLink>
               ))}
               {truckers.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
                     No truckers yet.
                   </td>
                 </tr>

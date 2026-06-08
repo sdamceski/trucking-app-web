@@ -80,11 +80,14 @@ export interface Load {
   reference: string;
   notes: string;
   invoiced: boolean;
+  invoicedAt: string;
+  invoicedNote: string;
   paid: boolean;
   cancelled: boolean;
   cancellationReason: string;
   documents: LoadDocument[];
   payoutSnapshot: PayoutSnapshot | null;
+  payoutId: string;
   createdAt: string;
 }
 
@@ -104,7 +107,42 @@ export interface LoadFinancials {
   companyMargin: number;
 }
 
+export interface PayoutLoadLine {
+  loadId: string;
+  loadRef: string;
+  base: number;
+  commissionPercent: number;
+  commissionAmount: number;
+  feeBreakdown: FeeBreakdownLine[];
+  feesTotal: number;
+  truckerPayout: number;
+}
+
+export interface PayoutRecurringLine {
+  feeId: string;
+  name: string;
+  frequency: RecurringFrequency;
+  type: FeeType;
+  amount: number;
+}
+
+export interface Payout {
+  id: string;
+  truckerId: string;
+  truckerName: string;
+  createdAt: string;
+  periodStart: string;
+  periodEnd: string;
+  notes: string;
+  loadLines: PayoutLoadLine[];
+  recurringLines: PayoutRecurringLine[];
+  loadsSubtotal: number;
+  recurringTotal: number;
+  netTotal: number;
+}
+
 export interface DataFile {
   truckers: Trucker[];
   loads: Load[];
+  payouts: Payout[];
 }

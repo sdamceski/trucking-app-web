@@ -86,6 +86,24 @@ export async function toggleFlag(
   revalidatePath(`/loads/${id}`);
 }
 
+export async function setInvoiced(id: string, date: string, note: string) {
+  await storeUpdateLoad(id, {
+    invoiced: true,
+    invoicedAt: (date || '').trim(),
+    invoicedNote: (note || '').trim(),
+  });
+  revalidatePath('/loads');
+  revalidatePath('/reports');
+  revalidatePath(`/loads/${id}`);
+}
+
+export async function clearInvoiced(id: string) {
+  await storeUpdateLoad(id, { invoiced: false, invoicedAt: '', invoicedNote: '' });
+  revalidatePath('/loads');
+  revalidatePath('/reports');
+  revalidatePath(`/loads/${id}`);
+}
+
 export async function deleteLoad(id: string) {
   await storeDeleteLoad(id);
   revalidatePath('/loads');

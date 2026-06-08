@@ -50,7 +50,7 @@
       "reference": "BOL-42",
       "notes": "Edited from detail page test",
       "invoiced": true,
-      "paid": false,
+      "paid": true,
       "cancelled": false,
       "cancellationReason": "",
       "documents": [],
@@ -67,6 +67,7 @@
         ],
         "capturedAt": "2026-06-06T20:07:44.566Z"
       },
+      "payoutId": "PAY-E41E20",
       "createdAt": "2026-06-06T19:00:45.521Z"
     },
     {
@@ -85,11 +86,12 @@
       "reference": "",
       "notes": "",
       "invoiced": false,
-      "paid": false,
+      "paid": true,
       "cancelled": false,
       "cancellationReason": "",
       "documents": [],
       "payoutSnapshot": null,
+      "payoutId": "PAY-3E8B91",
       "createdAt": "2026-06-06T19:01:39.051Z"
     },
     {
@@ -113,7 +115,85 @@
       "cancellationReason": "",
       "documents": [],
       "payoutSnapshot": null,
+      "payoutId": "",
       "createdAt": "2026-06-06T19:24:55.364Z"
+    }
+  ],
+  "payouts": [
+    {
+      "id": "PAY-3E8B91",
+      "truckerId": "TRK-DC50D4",
+      "truckerName": "John Driver",
+      "createdAt": "2026-06-08T18:05:16.022Z",
+      "periodStart": "",
+      "periodEnd": "2026-06-08",
+      "notes": "",
+      "loadLines": [
+        {
+          "loadId": "LOAD-F21394",
+          "loadRef": "LOAD-F21394",
+          "base": 900,
+          "commissionPercent": 10,
+          "commissionAmount": 90,
+          "feeBreakdown": [
+            {
+              "source": "commission",
+              "name": "Commission (10%)",
+              "amount": 90
+            }
+          ],
+          "feesTotal": 90,
+          "truckerPayout": 810
+        }
+      ],
+      "recurringLines": [],
+      "loadsSubtotal": 810,
+      "recurringTotal": 0,
+      "netTotal": 810
+    },
+    {
+      "id": "PAY-E41E20",
+      "truckerId": "TRK-DC50D4",
+      "truckerName": "John Driver",
+      "createdAt": "2026-06-08T18:05:32.253Z",
+      "periodStart": "2026-06-09",
+      "periodEnd": "2026-06-08",
+      "notes": "",
+      "loadLines": [
+        {
+          "loadId": "LOAD-DCB84F",
+          "loadRef": "BOL-42",
+          "base": 1000,
+          "commissionPercent": 10,
+          "commissionAmount": 100,
+          "feeBreakdown": [
+            {
+              "source": "commission",
+              "name": "Commission (10%)",
+              "amount": 100
+            },
+            {
+              "source": "perLoadFee",
+              "name": "Insurance",
+              "amount": 300
+            }
+          ],
+          "feesTotal": 400,
+          "truckerPayout": 600
+        }
+      ],
+      "recurringLines": [
+        {
+          "feeId": "FEE-6173D4",
+          "name": "Weekly insurance",
+          "frequency": "weekly",
+          "type": "fixed",
+          "amount": 300
+        }
+      ],
+      "loadsSubtotal": 600,
+      "recurringTotal": 300,
+      "netTotal": 300
     }
   ]
 }
