@@ -4,6 +4,7 @@ import { getLoad, getTruckers } from '@/lib/store';
 import { computeLoadFinancials } from '@/lib/financials';
 import { LoadStatus } from '@/lib/types';
 import LoadEditForm from '@/components/LoadEditForm';
+import LoadDocuments from '@/components/LoadDocuments';
 import {
   STATUS_LABEL,
   StatusActions,
@@ -162,6 +163,14 @@ export default async function LoadDetailPage({
           Details
         </h2>
         <LoadEditForm load={load} truckers={truckers} />
+      </section>
+
+      {/* Documents */}
+      <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+          Documents
+        </h2>
+        <LoadDocuments loadId={load.id} documents={load.documents} />
       </section>
     </div>
   );

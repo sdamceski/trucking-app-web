@@ -7,6 +7,14 @@ import {
   Trucker,
 } from './types';
 
+/**
+ * Effective rate paid to the trucker. Falls back to the load price when the
+ * trucker rate is unset (0), so users can leave it blank to mean "pay through".
+ */
+export function effectiveTruckerRate(load: Load): number {
+  return load.truckerRate > 0 ? load.truckerRate : load.loadPrice || 0;
+}
+
 export function makePayoutSnapshot(trucker: Trucker): PayoutSnapshot {
   return {
     truckerId: trucker.id,
@@ -22,7 +30,7 @@ export function makePayoutSnapshot(trucker: Trucker): PayoutSnapshot {
  * trucker's current config.
  */
 export function computeLoadFinancials(load: Load, trucker?: Trucker): LoadFinancials {
-  const base = load.truckerRate || load.loadPrice || 0;
+  const base = effectiveTruckerRate(load);
   const snapshot = load.payoutSnapshot;
 
   const commissionPercent = snapshot?.commissionPercent ?? trucker?.commissionPercent ?? 0;

@@ -1,4 +1,5 @@
 import { getLoads, getTruckers } from '@/lib/store';
+import { effectiveTruckerRate } from '@/lib/financials';
 
 const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
@@ -7,7 +8,7 @@ export default async function ReportsPage() {
 
   const active = loads.filter((l) => !l.cancelled);
   const totalBooked = active.reduce((s, l) => s + (l.loadPrice || 0), 0);
-  const totalPayout = active.reduce((s, l) => s + (l.truckerRate || 0), 0);
+  const totalPayout = active.reduce((s, l) => s + effectiveTruckerRate(l), 0);
   const totalMargin = totalBooked - totalPayout;
 
   const stats = [

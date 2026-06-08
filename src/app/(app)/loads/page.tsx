@@ -1,4 +1,5 @@
 import { getLoads, getTruckers } from '@/lib/store';
+import { effectiveTruckerRate } from '@/lib/financials';
 import NewLoadButton from '@/components/NewLoadButton';
 import LoadsFilters from '@/components/LoadsFilters';
 import LoadsList, { applyLoadFilters, money } from '@/components/LoadsList';
@@ -18,7 +19,7 @@ export default async function LoadsPage({
   const loads = applyLoadFilters(allLoads, flat);
 
   const totalPrice = loads.reduce((s, l) => s + (l.loadPrice || 0), 0);
-  const totalRate = loads.reduce((s, l) => s + (l.truckerRate || 0), 0);
+  const totalRate = loads.reduce((s, l) => s + effectiveTruckerRate(l), 0);
 
   return (
     <div className="space-y-6">

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Load, LoadStatus, Trucker } from '@/lib/types';
+import { effectiveTruckerRate } from '@/lib/financials';
 import RowLink from './RowLink';
 const STATUS_LABEL: Record<LoadStatus, string> = {
   new: 'New',
@@ -47,7 +48,17 @@ export default function LoadsList({
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="font-medium">{l.reference || l.id}</div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{l.reference || l.id}</span>
+                    {l.documents.length > 0 && (
+                      <span
+                        title={`${l.documents.length} document(s)`}
+                        className="inline-flex items-center gap-0.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600"
+                      >
+                        📎 {l.documents.length}
+                      </span>
+                    )}
+                  </div>
                   <div className="mt-0.5 text-xs text-slate-500">{l.id}</div>
                 </div>
                 <span
@@ -107,7 +118,7 @@ export default function LoadsList({
                   <div className="text-xs uppercase tracking-wide text-slate-400">Price / Rate</div>
                   <div>
                     {money.format(l.loadPrice)} <span className="text-slate-400">/</span>{' '}
-                    {money.format(l.truckerRate)}
+                    {money.format(effectiveTruckerRate(l))}
                   </div>
                 </div>
               </div>
@@ -145,7 +156,17 @@ export default function LoadsList({
               {loads.map((l) => (
                 <RowLink key={l.id} href={`/loads/${l.id}`} className="hover:bg-slate-50">
                   <td className="px-4 py-2">
-                    <div className="font-medium">{l.reference || '—'}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{l.reference || '—'}</span>
+                      {l.documents.length > 0 && (
+                        <span
+                          title={`${l.documents.length} document(s)`}
+                          className="inline-flex items-center gap-0.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600"
+                        >
+                          📎 {l.documents.length}
+                        </span>
+                      )}
+                    </div>
                     <div className="text-xs text-slate-400">{l.id}</div>
                   </td>
                   {showTruckerColumn && (
@@ -164,7 +185,7 @@ export default function LoadsList({
                     </span>
                   </td>
                   <td className="px-4 py-2 text-right tabular-nums">{money.format(l.loadPrice)}</td>
-                  <td className="px-4 py-2 text-right tabular-nums">{money.format(l.truckerRate)}</td>
+                  <td className="px-4 py-2 text-right tabular-nums">{money.format(effectiveTruckerRate(l))}</td>
                   <td className="px-4 py-2">
                     {l.invoiced ? (
                       <span className="inline-flex items-center rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700 ring-1 ring-inset ring-sky-200">

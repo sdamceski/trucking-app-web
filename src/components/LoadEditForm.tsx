@@ -4,6 +4,8 @@ import { useTransition, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { updateLoad } from '@/lib/actions/loads';
 import { Field, btnPrimary, btnSecondary, inputCx } from './form';
+import AddressAutocomplete from './AddressAutocomplete';
+import LoadPricingFields from './LoadPricingFields';
 import { Load, Trucker } from '@/lib/types';
 
 export default function LoadEditForm({
@@ -75,12 +77,7 @@ export default function LoadEditForm({
           />
         </Field>
         <Field label="Origin address">
-          <input
-            name="originAddress"
-            type="text"
-            defaultValue={load.originAddress}
-            className={inputCx}
-          />
+          <AddressAutocomplete name="originAddress" defaultValue={load.originAddress} />
         </Field>
         <Field label="Destination company">
           <input
@@ -91,36 +88,15 @@ export default function LoadEditForm({
           />
         </Field>
         <Field label="Destination address">
-          <input
-            name="destinationAddress"
-            type="text"
-            defaultValue={load.destinationAddress}
-            className={inputCx}
-          />
+          <AddressAutocomplete name="destinationAddress" defaultValue={load.destinationAddress} />
         </Field>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Field label="Load price ($)">
-          <input
-            name="loadPrice"
-            type="number"
-            step="0.01"
-            min={0}
-            defaultValue={load.loadPrice}
-            className={inputCx}
-          />
-        </Field>
-        <Field label="Trucker rate ($)">
-          <input
-            name="truckerRate"
-            type="number"
-            step="0.01"
-            min={0}
-            defaultValue={load.truckerRate}
-            className={inputCx}
-          />
-        </Field>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <LoadPricingFields
+          defaultLoadPrice={load.loadPrice}
+          defaultTruckerRate={load.truckerRate}
+        />
         <Field label="Reference">
           <input name="reference" type="text" defaultValue={load.reference} className={inputCx} />
         </Field>

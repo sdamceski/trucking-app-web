@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getLoads, getPayoutsByTrucker, getTrucker, getTruckers } from '@/lib/store';
+import { effectiveTruckerRate } from '@/lib/financials';
 import {
   DeleteTruckerButton,
   PerLoadFees,
@@ -43,7 +44,7 @@ export default async function TruckerDetailPage({
 
   const myLoads = allLoads.filter((l) => l.truckerId === trucker.id);
   const activeLoads = myLoads.filter((l) => !l.cancelled);
-  const totalRate = activeLoads.reduce((s, l) => s + (l.truckerRate || 0), 0);
+  const totalRate = activeLoads.reduce((s, l) => s + effectiveTruckerRate(l), 0);
   const eligibleCount = myLoads.filter((l) => !l.payoutId && !l.cancelled).length;
   const unpaidCount = myLoads.filter((l) => !l.paid).length;
   const filteredLoads =

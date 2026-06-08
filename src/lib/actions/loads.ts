@@ -3,14 +3,16 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import {
+  addLoadDocument,
   createLoad as storeCreateLoad,
   deleteLoad as storeDeleteLoad,
   getLoad,
   updateLoad as storeUpdateLoad,
 } from '@/lib/store';
-import { LOAD_STATUSES } from '@/lib/types';
+import { LOAD_STATUSES, type LoadDocument } from '@/lib/types';
 import type { LoadStatus } from '@/lib/types';
 import { requireAdmin, requireTrucker } from '@/lib/auth/dal';
+import { deleteObject, moveObject, objectKey } from '@/lib/gcs';
 
 const VALID_STATUS = new Set<string>(LOAD_STATUSES);
 const TRUCKER_ALLOWED_STATUS = new Set<LoadStatus>([
@@ -55,6 +57,38 @@ export async function createLoad(fd: FormData) {
     throw new Error('Pickup date is required');
   }
   const created = await storeCreateLoad(input);
+
+  // Attach the document that the load was extracted from, if any.
+  const stagingKey = s(fd.get('stagingKey'));
+  const stagedDocId = s(fd.get('stagedDocId'));
+  const stagedName = s(fd.get('stagedName'));
+  const stagedMime = s(fd.get('stagedMime'));
+  const stagedSize = n(fd.get('stagedSize'));
+  if (stagingKey && stagedDocId && stagedName) {
+    const filename = stagedName;
+    const dstKey = objectKey(created.id, stagedDocId, filename);
+    try {
+      await moveObject(stagingKey, dstKey);
+      const doc: LoadDocument = {
+        id: stagedDocId,
+        category: 'rateConfirmation',
+        name: filename,
+        size: stagedSize,
+        mimeType: stagedMime,
+        uploadedAt: new Date().toISOString(),
+        url: dstKey,
+      };
+      await addLoadDocument(created.id, doc);
+    } catch {
+      // Best effort. If move fails the staging file will be reaped by lifecycle.
+      try {
+        await deleteObject(stagingKey);
+      } catch {
+        // ignore
+      }
+    }
+  }
+
   revalidatePath('/loads');
   revalidatePath('/reports');
   redirect(`/loads/${created.id}`);

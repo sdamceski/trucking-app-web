@@ -1,9 +1,11 @@
 import {
   DOC_CATEGORIES,
   DataFile,
+  DocCategory,
   LOAD_FLAGS,
   LOAD_STATUSES,
   Load,
+  LoadDocument,
   LoadStatus,
   Payout,
   PayoutLoadLine,
@@ -16,6 +18,7 @@ import {
 } from './types';
 import { newId } from './ids';
 import { computeLoadFinancials, makePayoutSnapshot } from './financials';
+import { deletePrefix } from './gcs';
 import { prisma } from './prisma';
 import type {
   Load as DbLoad,
@@ -291,7 +294,7 @@ export async function createLoad(input: LoadInput): Promise<Load> {
       destinationAddress: str(input.destinationAddress),
       loadPrice,
       truckerRate,
-      margin: +(loadPrice - truckerRate).toFixed(2),
+      margin: +(loadPrice - (truckerRate || loadPrice)).toFixed(2),
       reference: str(input.reference),
       notes: str(input.notes),
       invoiced: !!input.invoiced,
@@ -337,7 +340,7 @@ export async function updateLoad(id: string, input: LoadInput): Promise<Load | n
   const nextRate = input.truckerRate !== undefined ? num(input.truckerRate) : cur.truckerRate;
   if (input.loadPrice !== undefined) data.loadPrice = nextPrice;
   if (input.truckerRate !== undefined) data.truckerRate = nextRate;
-  data.margin = +(nextPrice - nextRate).toFixed(2);
+  data.margin = +(nextPrice - (nextRate || nextPrice)).toFixed(2);
 
   for (const flag of LOAD_FLAGS) {
     if (input[flag] !== undefined) data[flag] = !!input[flag];
@@ -388,10 +391,96 @@ export async function updateLoad(id: string, input: LoadInput): Promise<Load | n
 export async function deleteLoad(id: string): Promise<boolean> {
   try {
     await prisma.load.delete({ where: { id } });
-    return true;
   } catch {
     return false;
   }
+  try {
+    await deletePrefix(`loads/${id}/`);
+  } catch {
+    // Bucket cleanup is best-effort; orphaned objects can be reaped later.
+  }
+  return true;
+}
+
+// ============================================================================
+// Load documents
+// ============================================================================
+
+const VALID_DOC_CATEGORY = new Set<DocCategory>(DOC_CATEGORIES);
+
+function normalizeDoc(raw: unknown): LoadDocument | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const category = VALID_DOC_CATEGORY.has(r.category as DocCategory)
+    ? (r.category as DocCategory)
+    : 'other';
+  const id = str(r.id);
+  if (!id) return null;
+  return {
+    id,
+    category,
+    name: str(r.name),
+    size: num(r.size),
+    mimeType: str(r.mimeType),
+    uploadedAt: str(r.uploadedAt),
+    url: str(r.url),
+  };
+}
+
+function readDocs(value: unknown): LoadDocument[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((d) => normalizeDoc(d))
+    .filter((d): d is LoadDocument => d !== null);
+}
+
+export async function addLoadDocument(
+  loadId: string,
+  doc: LoadDocument,
+): Promise<LoadDocument | null> {
+  const cur = await prisma.load.findUnique({
+    where: { id: loadId },
+    select: { documents: true },
+  });
+  if (!cur) return null;
+  const next = [...readDocs(cur.documents), doc];
+  await prisma.load.update({
+    where: { id: loadId },
+    data: { documents: next as unknown as object },
+  });
+  return doc;
+}
+
+export async function getLoadDocument(
+  loadId: string,
+  docId: string,
+): Promise<LoadDocument | null> {
+  const cur = await prisma.load.findUnique({
+    where: { id: loadId },
+    select: { documents: true },
+  });
+  if (!cur) return null;
+  return readDocs(cur.documents).find((d) => d.id === docId) ?? null;
+}
+
+export async function removeLoadDocument(
+  loadId: string,
+  docId: string,
+): Promise<LoadDocument | null> {
+  const cur = await prisma.load.findUnique({
+    where: { id: loadId },
+    select: { documents: true },
+  });
+  if (!cur) return null;
+  const docs = readDocs(cur.documents);
+  const target = docs.find((d) => d.id === docId);
+  if (!target) return null;
+  const next = docs.filter((d) => d.id !== docId);
+  await prisma.load.update({
+    where: { id: loadId },
+    data: { documents: next as unknown as object },
+  });
+  return target;
 }
 
 // ============================================================================
