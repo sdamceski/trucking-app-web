@@ -76,7 +76,7 @@ export async function setLoadStatus(id: string, status: LoadStatus) {
   revalidatePath(`/loads/${id}`);
 }
 
-export async function setMyLoadStatus(id: string, status: LoadStatus) {
+export async function setMyLoadStatus(id: string, status: LoadStatus, date?: string) {
   const session = await requireTrucker();
   if (!TRUCKER_ALLOWED_STATUS.has(status)) {
     throw new Error('Truckers can only set status to picked up or delivered');
@@ -85,7 +85,11 @@ export async function setMyLoadStatus(id: string, status: LoadStatus) {
   if (!load || load.truckerId !== session.truckerId) {
     throw new Error('Load not found');
   }
-  await storeUpdateLoad(id, { status });
+  const patch: Record<string, unknown> = { status };
+  const stamp = (date ?? '').trim() || new Date().toISOString().slice(0, 10);
+  if (status === 'picked_up') patch.pickedUpAt = stamp;
+  if (status === 'delivered') patch.deliveredAt = stamp;
+  await storeUpdateLoad(id, patch);
   revalidatePath('/my');
   revalidatePath(`/my/loads/${id}`);
 }

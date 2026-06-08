@@ -69,6 +69,8 @@ export interface Load {
   status: LoadStatus;
   pickupDate: string;
   deliveryDate: string;
+  pickedUpAt: string;
+  deliveredAt: string;
   truckerId: string;
   originCompany: string;
   originAddress: string;

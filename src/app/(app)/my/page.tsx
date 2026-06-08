@@ -56,6 +56,8 @@ export default async function MyLoadsPage({
           status: l.status,
           pickupDate: l.pickupDate,
           deliveryDate: l.deliveryDate,
+          pickedUpAt: l.pickedUpAt,
+          deliveredAt: l.deliveredAt,
           originCompany: l.originCompany,
           originAddress: l.originAddress,
           destinationCompany: l.destinationCompany,

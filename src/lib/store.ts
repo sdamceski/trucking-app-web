@@ -73,6 +73,8 @@ function mapLoad(l: DbLoad): Load {
     status: l.status as LoadStatus,
     pickupDate: l.pickupDate,
     deliveryDate: l.deliveryDate,
+    pickedUpAt: l.pickedUpAt,
+    deliveredAt: l.deliveredAt,
     truckerId: l.truckerId ?? '',
     originCompany: l.originCompany,
     originAddress: l.originAddress,
@@ -313,6 +315,8 @@ export async function updateLoad(id: string, input: LoadInput): Promise<Load | n
 
   if (input.pickupDate !== undefined) data.pickupDate = str(input.pickupDate);
   if (input.deliveryDate !== undefined) data.deliveryDate = str(input.deliveryDate);
+  if (input.pickedUpAt !== undefined) data.pickedUpAt = str(input.pickedUpAt);
+  if (input.deliveredAt !== undefined) data.deliveredAt = str(input.deliveredAt);
   if (input.originCompany !== undefined) data.originCompany = str(input.originCompany);
   if (input.originAddress !== undefined) data.originAddress = str(input.originAddress);
   if (input.destinationCompany !== undefined) {

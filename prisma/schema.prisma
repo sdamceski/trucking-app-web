@@ -59,6 +59,8 @@ model Load {
   status              LoadStatus
   pickupDate          String     @default("")
   deliveryDate        String     @default("")
+  pickedUpAt          String     @default("")
+  deliveredAt         String     @default("")
   truckerId           String?
   originCompany       String     @default("")
   originAddress       String     @default("")
