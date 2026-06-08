@@ -1,13 +1,13 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
 import {
-  DataFile,
   DOC_CATEGORIES,
-  Load,
+  DataFile,
   LOAD_FLAGS,
   LOAD_STATUSES,
-  LoadDocument,
+  Load,
   LoadStatus,
+  Payout,
+  PayoutLoadLine,
+  PayoutRecurringLine,
   PerLoadFee,
   RECURRING_FREQUENCIES,
   RecurringFee,
@@ -15,9 +15,13 @@ import {
   VALID_FEE_TYPE,
 } from './types';
 import { newId } from './ids';
-import { makePayoutSnapshot } from './financials';
-
-const DATA_FILE = path.join(process.cwd(), 'data', 'data.json');
+import { computeLoadFinancials, makePayoutSnapshot } from './financials';
+import { prisma } from './prisma';
+import type {
+  Load as DbLoad,
+  Payout as DbPayout,
+  Trucker as DbTrucker,
+} from '@prisma/client';
 
 const VALID_STATUS = new Set<LoadStatus>(LOAD_STATUSES);
 
@@ -25,51 +29,116 @@ function defaultStatus(load: Pick<Load, 'truckerId'>): LoadStatus {
   return load.truckerId ? 'assigned' : 'new';
 }
 
-function migrateLoad(raw: Partial<Load> & Record<string, unknown>): Load {
-  let status = raw.status as string | undefined;
-  let invoiced = !!raw.invoiced;
-  let paid = !!raw.paid;
-  let cancelled = !!raw.cancelled;
-  if (status === 'in_transit') status = 'picked_up';
-  else if (status === 'invoiced') {
-    status = 'delivered';
-    invoiced = true;
-  } else if (status === 'paid') {
-    status = 'delivered';
-    invoiced = true;
-    paid = true;
-  } else if (status === 'cancelled') {
-    status = defaultStatus({ truckerId: String(raw.truckerId ?? '') });
-    cancelled = true;
-  }
-  if (!status || !VALID_STATUS.has(status as LoadStatus)) {
-    status = defaultStatus({ truckerId: String(raw.truckerId ?? '') });
-  }
+function str(v: unknown): string {
+  return typeof v === 'string' ? v : v == null ? '' : String(v);
+}
+
+function num(v: unknown): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+// ============================================================================
+// DB → domain mappers
+// ============================================================================
+
+function mapTrucker(t: DbTrucker): Trucker {
+  const perLoadFees = Array.isArray(t.perLoadFees)
+    ? (t.perLoadFees as unknown[]).map(
+        (f) => normalizeFee(f as Record<string, unknown>, false) as PerLoadFee,
+      )
+    : [];
+  const recurringFees = Array.isArray(t.recurringFees)
+    ? (t.recurringFees as unknown[]).map(
+        (f) => normalizeFee(f as Record<string, unknown>, true) as RecurringFee,
+      )
+    : [];
   return {
-    id: String(raw.id ?? newId('LOAD')),
-    status: status as LoadStatus,
-    pickupDate: str(raw.pickupDate),
-    deliveryDate: str(raw.deliveryDate),
-    truckerId: str(raw.truckerId),
-    originCompany: str(raw.originCompany),
-    originAddress: str(raw.originAddress),
-    destinationCompany: str(raw.destinationCompany),
-    destinationAddress: str(raw.destinationAddress),
-    loadPrice: num(raw.loadPrice),
-    truckerRate: num(raw.truckerRate),
-    margin: num(raw.margin),
-    reference: str(raw.reference),
-    notes: str(raw.notes),
-    invoiced,
-    paid,
-    cancelled,
-    cancellationReason: str(raw.cancellationReason),
-    documents: Array.isArray(raw.documents) ? (raw.documents as LoadDocument[]) : [],
-    payoutSnapshot:
-      raw.payoutSnapshot && typeof raw.payoutSnapshot === 'object'
-        ? (raw.payoutSnapshot as Load['payoutSnapshot'])
-        : null,
-    createdAt: str(raw.createdAt) || new Date().toISOString(),
+    id: t.id,
+    name: t.name,
+    phone: t.phone,
+    email: t.email,
+    truckNumber: t.truckNumber,
+    notes: t.notes,
+    createdAt: t.createdAt.toISOString(),
+    commissionPercent: t.commissionPercent,
+    perLoadFees,
+    recurringFees,
+  };
+}
+
+function mapLoad(l: DbLoad): Load {
+  return {
+    id: l.id,
+    status: l.status as LoadStatus,
+    pickupDate: l.pickupDate,
+    deliveryDate: l.deliveryDate,
+    truckerId: l.truckerId ?? '',
+    originCompany: l.originCompany,
+    originAddress: l.originAddress,
+    destinationCompany: l.destinationCompany,
+    destinationAddress: l.destinationAddress,
+    loadPrice: l.loadPrice,
+    truckerRate: l.truckerRate,
+    margin: l.margin,
+    reference: l.reference,
+    notes: l.notes,
+    invoiced: l.invoiced,
+    invoicedAt: l.invoicedAt,
+    invoicedNote: l.invoicedNote,
+    paid: l.paid,
+    cancelled: l.cancelled,
+    cancellationReason: l.cancellationReason,
+    documents: Array.isArray(l.documents) ? (l.documents as Load['documents']) : [],
+    payoutSnapshot: (l.payoutSnapshot as Load['payoutSnapshot']) ?? null,
+    payoutId: l.payoutId ?? '',
+    createdAt: l.createdAt.toISOString(),
+  };
+}
+
+function mapPayout(p: DbPayout): Payout {
+  const loadLines = Array.isArray(p.loadLines)
+    ? (p.loadLines as unknown[]).map((line) => {
+        const l = line as Record<string, unknown>;
+        return {
+          loadId: str(l.loadId),
+          loadRef: str(l.loadRef),
+          base: num(l.base),
+          commissionPercent: num(l.commissionPercent),
+          commissionAmount: num(l.commissionAmount),
+          feeBreakdown: Array.isArray(l.feeBreakdown)
+            ? (l.feeBreakdown as PayoutLoadLine['feeBreakdown'])
+            : [],
+          feesTotal: num(l.feesTotal),
+          truckerPayout: num(l.truckerPayout),
+        } as PayoutLoadLine;
+      })
+    : [];
+  const recurringLines = Array.isArray(p.recurringLines)
+    ? (p.recurringLines as unknown[]).map((line) => {
+        const l = line as Record<string, unknown>;
+        return {
+          feeId: str(l.feeId),
+          name: str(l.name),
+          frequency: (l.frequency as PayoutRecurringLine['frequency']) ?? 'monthly',
+          type: (l.type as PayoutRecurringLine['type']) ?? 'fixed',
+          amount: num(l.amount),
+        } as PayoutRecurringLine;
+      })
+    : [];
+  return {
+    id: p.id,
+    truckerId: p.truckerId,
+    truckerName: p.truckerName,
+    createdAt: p.createdAt.toISOString(),
+    periodStart: p.periodStart,
+    periodEnd: p.periodEnd,
+    notes: p.notes,
+    loadLines,
+    recurringLines,
+    loadsSubtotal: p.loadsSubtotal,
+    recurringTotal: p.recurringTotal,
+    netTotal: p.netTotal,
   };
 }
 
@@ -93,87 +162,37 @@ function normalizeFee(
   return { ...base, frequency };
 }
 
-function normalizeTrucker(raw: Partial<Trucker> & Record<string, unknown>): Trucker {
-  const commission = num(raw.commissionPercent);
-  return {
-    id: String(raw.id ?? newId('TRK')),
-    name: str(raw.name),
-    phone: str(raw.phone),
-    email: str(raw.email),
-    truckNumber: str(raw.truckNumber),
-    notes: str(raw.notes),
-    createdAt: str(raw.createdAt) || new Date().toISOString(),
-    commissionPercent: Math.max(0, Math.min(100, commission)),
-    perLoadFees: Array.isArray(raw.perLoadFees)
-      ? (raw.perLoadFees.map((f) =>
-          normalizeFee(f as Partial<RecurringFee>, false),
-        ) as PerLoadFee[])
-      : [],
-    recurringFees: Array.isArray(raw.recurringFees)
-      ? (raw.recurringFees.map((f) =>
-          normalizeFee(f as Partial<RecurringFee>, true),
-        ) as RecurringFee[])
-      : [],
-  };
-}
-
-function str(v: unknown): string {
-  return typeof v === 'string' ? v : v == null ? '' : String(v);
-}
-
-function num(v: unknown): number {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
-
-async function readFile(): Promise<DataFile> {
-  try {
-    const raw = await fs.readFile(DATA_FILE, 'utf-8');
-    const parsed = JSON.parse(raw) as Partial<DataFile>;
-    return {
-      truckers: Array.isArray(parsed.truckers)
-        ? parsed.truckers.map((t) =>
-            normalizeTrucker(t as Partial<Trucker> & Record<string, unknown>),
-          )
-        : [],
-      loads: Array.isArray(parsed.loads)
-        ? parsed.loads.map((l) => migrateLoad(l as Partial<Load> & Record<string, unknown>))
-        : [],
-    };
-  } catch {
-    return { truckers: [], loads: [] };
-  }
-}
-
-async function writeFile(data: DataFile): Promise<void> {
-  await fs.mkdir(path.dirname(DATA_FILE), { recursive: true });
-  await fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2), 'utf-8');
-}
-
 // ============================================================================
 // Reads
 // ============================================================================
 
 export async function getTruckers(): Promise<Trucker[]> {
-  return (await readFile()).truckers;
+  const rows = await prisma.trucker.findMany({ orderBy: { createdAt: 'asc' } });
+  return rows.map(mapTrucker);
 }
 
 export async function getTrucker(id: string): Promise<Trucker | null> {
-  const data = await readFile();
-  return data.truckers.find((t) => t.id === id) ?? null;
+  const t = await prisma.trucker.findUnique({ where: { id } });
+  return t ? mapTrucker(t) : null;
 }
 
 export async function getLoads(): Promise<Load[]> {
-  return (await readFile()).loads;
+  const rows = await prisma.load.findMany({ orderBy: { createdAt: 'asc' } });
+  return rows.map(mapLoad);
 }
 
 export async function getLoad(id: string): Promise<Load | null> {
-  const data = await readFile();
-  return data.loads.find((l) => l.id === id) ?? null;
+  const l = await prisma.load.findUnique({ where: { id } });
+  return l ? mapLoad(l) : null;
 }
 
 export async function getData(): Promise<DataFile> {
-  return readFile();
+  const [truckers, loads, payouts] = await Promise.all([
+    getTruckers(),
+    getLoads(),
+    getPayouts(),
+  ]);
+  return { truckers, loads, payouts };
 }
 
 // ============================================================================
@@ -183,35 +202,55 @@ export async function getData(): Promise<DataFile> {
 export type TruckerInput = Partial<Omit<Trucker, 'id' | 'createdAt'>>;
 
 export async function createTrucker(input: TruckerInput): Promise<Trucker> {
-  const data = await readFile();
-  const t = normalizeTrucker({
-    ...input,
-    id: newId('TRK'),
-    createdAt: new Date().toISOString(),
+  const t = await prisma.trucker.create({
+    data: {
+      id: newId('TRK'),
+      name: str(input.name),
+      phone: str(input.phone),
+      email: str(input.email),
+      truckNumber: str(input.truckNumber),
+      notes: str(input.notes),
+      commissionPercent: Math.max(0, Math.min(100, num(input.commissionPercent))),
+      perLoadFees: (input.perLoadFees ?? []).map((f) => normalizeFee(f, false)),
+      recurringFees: (input.recurringFees ?? []).map((f) => normalizeFee(f, true)),
+    },
   });
-  data.truckers.push(t);
-  await writeFile(data);
-  return t;
+  return mapTrucker(t);
 }
 
 export async function updateTrucker(id: string, input: TruckerInput): Promise<Trucker | null> {
-  const data = await readFile();
-  const idx = data.truckers.findIndex((t) => t.id === id);
-  if (idx === -1) return null;
-  const merged = normalizeTrucker({ ...data.truckers[idx], ...input, id });
-  data.truckers[idx] = merged;
-  await writeFile(data);
-  return merged;
+  const existing = await prisma.trucker.findUnique({ where: { id } });
+  if (!existing) return null;
+
+  const data: Record<string, unknown> = {};
+  if (input.name !== undefined) data.name = str(input.name);
+  if (input.phone !== undefined) data.phone = str(input.phone);
+  if (input.email !== undefined) data.email = str(input.email);
+  if (input.truckNumber !== undefined) data.truckNumber = str(input.truckNumber);
+  if (input.notes !== undefined) data.notes = str(input.notes);
+  if (input.commissionPercent !== undefined) {
+    data.commissionPercent = Math.max(0, Math.min(100, num(input.commissionPercent)));
+  }
+  if (input.perLoadFees !== undefined) {
+    data.perLoadFees = input.perLoadFees.map((f) => normalizeFee(f, false));
+  }
+  if (input.recurringFees !== undefined) {
+    data.recurringFees = input.recurringFees.map((f) => normalizeFee(f, true));
+  }
+
+  const t = await prisma.trucker.update({ where: { id }, data });
+  return mapTrucker(t);
 }
 
 export async function deleteTrucker(id: string): Promise<boolean> {
-  const data = await readFile();
-  const before = data.truckers.length;
-  data.truckers = data.truckers.filter((t) => t.id !== id);
-  if (data.truckers.length === before) return false;
-  data.loads = data.loads.map((l) => (l.truckerId === id ? { ...l, truckerId: '' } : l));
-  await writeFile(data);
-  return true;
+  try {
+    // Loads.truckerId has onDelete: SetNull, so loads survive with truckerId=null.
+    // Payouts.truckerId has onDelete: Cascade — payouts for this trucker are removed.
+    await prisma.trucker.delete({ where: { id } });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // ============================================================================
@@ -223,9 +262,10 @@ export type LoadInput = Partial<
 >;
 
 export async function createLoad(input: LoadInput): Promise<Load> {
-  const data = await readFile();
   const truckerId = str(input.truckerId);
-  const trucker = truckerId ? data.truckers.find((t) => t.id === truckerId) : undefined;
+  const trucker = truckerId
+    ? await prisma.trucker.findUnique({ where: { id: truckerId } })
+    : null;
   const loadPrice = num(input.loadPrice);
   const truckerRate = num(input.truckerRate);
   const status = (
@@ -233,99 +273,244 @@ export async function createLoad(input: LoadInput): Promise<Load> {
       ? input.status
       : defaultStatus({ truckerId })
   ) as LoadStatus;
-  const load: Load = {
-    id: newId('LOAD'),
-    status,
-    pickupDate: str(input.pickupDate),
-    deliveryDate: str(input.deliveryDate),
-    truckerId,
-    originCompany: str(input.originCompany),
-    originAddress: str(input.originAddress),
-    destinationCompany: str(input.destinationCompany),
-    destinationAddress: str(input.destinationAddress),
-    loadPrice,
-    truckerRate,
-    margin: +(loadPrice - truckerRate).toFixed(2),
-    reference: str(input.reference),
-    notes: str(input.notes),
-    invoiced: !!input.invoiced,
-    paid: !!input.paid,
-    cancelled: !!input.cancelled,
-    cancellationReason: str(input.cancellationReason),
-    documents: [],
-    payoutSnapshot: trucker ? makePayoutSnapshot(normalizeTrucker(trucker)) : null,
-    createdAt: new Date().toISOString(),
-  };
-  data.loads.push(load);
-  await writeFile(data);
-  return load;
+
+  const snapshot = trucker ? makePayoutSnapshot(mapTrucker(trucker)) : null;
+
+  const l = await prisma.load.create({
+    data: {
+      id: newId('LOAD'),
+      status,
+      pickupDate: str(input.pickupDate),
+      deliveryDate: str(input.deliveryDate),
+      truckerId: truckerId || null,
+      originCompany: str(input.originCompany),
+      originAddress: str(input.originAddress),
+      destinationCompany: str(input.destinationCompany),
+      destinationAddress: str(input.destinationAddress),
+      loadPrice,
+      truckerRate,
+      margin: +(loadPrice - truckerRate).toFixed(2),
+      reference: str(input.reference),
+      notes: str(input.notes),
+      invoiced: !!input.invoiced,
+      invoicedAt: str(input.invoicedAt),
+      invoicedNote: str(input.invoicedNote),
+      paid: !!input.paid,
+      cancelled: !!input.cancelled,
+      cancellationReason: str(input.cancellationReason),
+      documents: [],
+      payoutSnapshot: snapshot ?? undefined,
+    },
+  });
+  return mapLoad(l);
 }
 
 export async function updateLoad(id: string, input: LoadInput): Promise<Load | null> {
-  const data = await readFile();
-  const idx = data.loads.findIndex((l) => l.id === id);
-  if (idx === -1) return null;
-  const cur = data.loads[idx];
-  const next: Load = { ...cur };
+  const cur = await prisma.load.findUnique({ where: { id } });
+  if (!cur) return null;
 
-  const stringFields: (keyof Load)[] = [
-    'pickupDate',
-    'deliveryDate',
-    'truckerId',
-    'originCompany',
-    'originAddress',
-    'destinationCompany',
-    'destinationAddress',
-    'reference',
-    'notes',
-    'cancellationReason',
-  ];
-  for (const f of stringFields) {
-    if (input[f] !== undefined) (next as Record<string, unknown>)[f] = str(input[f]);
+  const data: Record<string, unknown> = {};
+
+  if (input.pickupDate !== undefined) data.pickupDate = str(input.pickupDate);
+  if (input.deliveryDate !== undefined) data.deliveryDate = str(input.deliveryDate);
+  if (input.originCompany !== undefined) data.originCompany = str(input.originCompany);
+  if (input.originAddress !== undefined) data.originAddress = str(input.originAddress);
+  if (input.destinationCompany !== undefined) {
+    data.destinationCompany = str(input.destinationCompany);
   }
-  if (input.loadPrice !== undefined) next.loadPrice = num(input.loadPrice);
-  if (input.truckerRate !== undefined) next.truckerRate = num(input.truckerRate);
-  next.margin = +(next.loadPrice - next.truckerRate).toFixed(2);
+  if (input.destinationAddress !== undefined) {
+    data.destinationAddress = str(input.destinationAddress);
+  }
+  if (input.reference !== undefined) data.reference = str(input.reference);
+  if (input.notes !== undefined) data.notes = str(input.notes);
+  if (input.cancellationReason !== undefined) {
+    data.cancellationReason = str(input.cancellationReason);
+  }
+  if (input.invoicedAt !== undefined) data.invoicedAt = str(input.invoicedAt);
+  if (input.invoicedNote !== undefined) data.invoicedNote = str(input.invoicedNote);
+
+  const nextPrice = input.loadPrice !== undefined ? num(input.loadPrice) : cur.loadPrice;
+  const nextRate = input.truckerRate !== undefined ? num(input.truckerRate) : cur.truckerRate;
+  if (input.loadPrice !== undefined) data.loadPrice = nextPrice;
+  if (input.truckerRate !== undefined) data.truckerRate = nextRate;
+  data.margin = +(nextPrice - nextRate).toFixed(2);
 
   for (const flag of LOAD_FLAGS) {
-    if (input[flag] !== undefined) next[flag] = !!input[flag];
+    if (input[flag] !== undefined) data[flag] = !!input[flag];
   }
-  if (input.cancelled !== undefined && !next.cancelled) next.cancellationReason = '';
+  if (input.cancelled !== undefined && !data.cancelled) data.cancellationReason = '';
+  if (input.invoiced === false) {
+    data.invoicedAt = '';
+    data.invoicedNote = '';
+  }
 
-  if (input.status !== undefined && VALID_STATUS.has(input.status)) {
-    next.status = input.status;
-  } else if (!cur.truckerId && next.truckerId && cur.status === 'new') {
-    next.status = 'assigned';
+  // Trucker reassignment + status auto-advance
+  let nextTruckerId: string | null | undefined;
+  if (input.truckerId !== undefined) {
+    nextTruckerId = str(input.truckerId) || null;
+    data.truckerId = nextTruckerId;
   }
-  if (
+  let nextStatus: LoadStatus = cur.status as LoadStatus;
+  if (input.status !== undefined && VALID_STATUS.has(input.status)) {
+    nextStatus = input.status;
+    data.status = nextStatus;
+  } else if (!cur.truckerId && nextTruckerId && cur.status === 'new') {
+    nextStatus = 'assigned';
+    data.status = nextStatus;
+  } else if (
     cur.truckerId &&
-    !next.truckerId &&
-    next.status === 'assigned' &&
+    nextTruckerId === null &&
+    cur.status === 'assigned' &&
     input.status === undefined
   ) {
-    next.status = 'new';
+    nextStatus = 'new';
+    data.status = nextStatus;
   }
 
-  if (cur.truckerId !== next.truckerId) {
-    if (next.truckerId) {
-      const t = data.truckers.find((x) => x.id === next.truckerId);
-      next.payoutSnapshot = t ? makePayoutSnapshot(normalizeTrucker(t)) : null;
+  // Recapture payout snapshot if trucker changed
+  if (input.truckerId !== undefined && (cur.truckerId ?? '') !== (nextTruckerId ?? '')) {
+    if (nextTruckerId) {
+      const t = await prisma.trucker.findUnique({ where: { id: nextTruckerId } });
+      data.payoutSnapshot = t ? makePayoutSnapshot(mapTrucker(t)) : undefined;
     } else {
-      next.payoutSnapshot = null;
+      data.payoutSnapshot = undefined;
     }
   }
 
-  data.loads[idx] = next;
-  await writeFile(data);
-  return next;
+  const updated = await prisma.load.update({ where: { id }, data });
+  return mapLoad(updated);
 }
 
 export async function deleteLoad(id: string): Promise<boolean> {
-  const data = await readFile();
-  const before = data.loads.length;
-  data.loads = data.loads.filter((l) => l.id !== id);
-  if (data.loads.length === before) return false;
-  await writeFile(data);
+  try {
+    await prisma.load.delete({ where: { id } });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ============================================================================
+// Payouts
+// ============================================================================
+
+export async function getPayouts(): Promise<Payout[]> {
+  const rows = await prisma.payout.findMany({ orderBy: { createdAt: 'desc' } });
+  return rows.map(mapPayout);
+}
+
+export async function getPayoutsByTrucker(truckerId: string): Promise<Payout[]> {
+  const rows = await prisma.payout.findMany({
+    where: { truckerId },
+    orderBy: { createdAt: 'desc' },
+  });
+  return rows.map(mapPayout);
+}
+
+export async function getPayout(id: string): Promise<Payout | null> {
+  const p = await prisma.payout.findUnique({ where: { id } });
+  return p ? mapPayout(p) : null;
+}
+
+export interface CreatePayoutInput {
+  truckerId: string;
+  loadIds: string[];
+  periodStart?: string;
+  periodEnd?: string;
+  notes?: string;
+  recurringFees?: { feeId: string; amount: number }[];
+}
+
+export async function createPayout(input: CreatePayoutInput): Promise<Payout | null> {
+  const truckerRow = await prisma.trucker.findUnique({ where: { id: input.truckerId } });
+  if (!truckerRow) return null;
+  const trucker = mapTrucker(truckerRow);
+
+  const eligibleLoads = await prisma.load.findMany({
+    where: { truckerId: trucker.id, payoutId: null, cancelled: false },
+  });
+  const eligibleIds = new Set(eligibleLoads.map((l) => l.id));
+  const picked = input.loadIds.filter((id) => eligibleIds.has(id));
+  if (picked.length === 0 && (input.recurringFees ?? []).length === 0) {
+    return null;
+  }
+
+  const loadLines: PayoutLoadLine[] = picked.map((id) => {
+    const dbLoad = eligibleLoads.find((l) => l.id === id)!;
+    const load = mapLoad(dbLoad);
+    const fin = computeLoadFinancials(load, trucker);
+    return {
+      loadId: load.id,
+      loadRef: load.reference || load.id,
+      base: fin.base,
+      commissionPercent: fin.commissionPercent,
+      commissionAmount: fin.commissionAmount,
+      feeBreakdown: fin.feeBreakdown,
+      feesTotal: fin.feesTotal,
+      truckerPayout: fin.truckerPayout,
+    };
+  });
+
+  const recurringLines: PayoutRecurringLine[] = (input.recurringFees ?? [])
+    .map((r) => {
+      const fee = trucker.recurringFees.find((f) => f.id === r.feeId);
+      if (!fee) return null;
+      const amount = +(Number.isFinite(r.amount) ? r.amount : fee.amount).toFixed(2);
+      return {
+        feeId: fee.id,
+        name: fee.name,
+        frequency: fee.frequency,
+        type: fee.type,
+        amount,
+      };
+    })
+    .filter((x): x is PayoutRecurringLine => x !== null && x.amount > 0);
+
+  const loadsSubtotal = +loadLines.reduce((s, l) => s + l.truckerPayout, 0).toFixed(2);
+  const recurringTotal = +recurringLines.reduce((s, l) => s + l.amount, 0).toFixed(2);
+  const netTotal = +(loadsSubtotal - recurringTotal).toFixed(2);
+
+  const payoutId = newId('PAY');
+  const [created] = await prisma.$transaction([
+    prisma.payout.create({
+      data: {
+        id: payoutId,
+        truckerId: trucker.id,
+        truckerName: trucker.name,
+        periodStart: str(input.periodStart),
+        periodEnd: str(input.periodEnd),
+        notes: str(input.notes),
+        loadLines: loadLines as unknown as object,
+        recurringLines: recurringLines as unknown as object,
+        loadsSubtotal,
+        recurringTotal,
+        netTotal,
+      },
+    }),
+    prisma.load.updateMany({
+      where: { id: { in: picked } },
+      data: { payoutId, paid: true },
+    }),
+  ]);
+
+  return mapPayout(created);
+}
+
+export async function voidPayout(id: string): Promise<boolean> {
+  const payout = await prisma.payout.findUnique({ where: { id } });
+  if (!payout) return false;
+  const loadIds = Array.isArray(payout.loadLines)
+    ? (payout.loadLines as unknown[])
+        .map((l) => str((l as Record<string, unknown>).loadId))
+        .filter(Boolean)
+    : [];
+  await prisma.$transaction([
+    prisma.load.updateMany({
+      where: { id: { in: loadIds } },
+      data: { payoutId: null, paid: false },
+    }),
+    prisma.payout.delete({ where: { id } }),
+  ]);
   return true;
 }
 

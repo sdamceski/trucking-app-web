@@ -1,0 +1,91 @@
+// Trucking Dispatch — Prisma schema
+// All IDs are the existing app-generated slugs (LOAD-XXXX, TRK-XXXX, PAY-XXXX)
+// so URLs and existing JSON data carry over unchanged.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum LoadStatus {
+  new
+  assigned
+  picked_up
+  delivered
+}
+
+model Trucker {
+  id                String   @id
+  name              String
+  phone             String   @default("")
+  email             String   @default("")
+  truckNumber       String   @default("")
+  notes             String   @default("")
+  commissionPercent Float    @default(0)
+  // Embedded fee arrays — small bounded lists, no need to split into tables
+  perLoadFees       Json     @default("[]")
+  recurringFees     Json     @default("[]")
+  createdAt         DateTime @default(now())
+
+  loads   Load[]
+  payouts Payout[]
+}
+
+model Load {
+  id                  String     @id
+  status              LoadStatus
+  pickupDate          String     @default("")
+  deliveryDate        String     @default("")
+  truckerId           String?
+  originCompany       String     @default("")
+  originAddress       String     @default("")
+  destinationCompany  String     @default("")
+  destinationAddress  String     @default("")
+  loadPrice           Float      @default(0)
+  truckerRate         Float      @default(0)
+  margin              Float      @default(0)
+  reference           String     @default("")
+  notes               String     @default("")
+  invoiced            Boolean    @default(false)
+  invoicedAt          String     @default("")
+  invoicedNote        String     @default("")
+  paid                Boolean    @default(false)
+  cancelled           Boolean    @default(false)
+  cancellationReason  String     @default("")
+  documents           Json       @default("[]")
+  payoutSnapshot      Json?
+  payoutId            String?
+  createdAt           DateTime   @default(now())
+
+  trucker Trucker? @relation(fields: [truckerId], references: [id], onDelete: SetNull)
+  payout  Payout?  @relation(fields: [payoutId], references: [id], onDelete: SetNull)
+
+  @@index([truckerId])
+  @@index([payoutId])
+  @@index([status])
+}
+
+model Payout {
+  id             String   @id
+  truckerId      String
+  truckerName    String
+  periodStart    String   @default("")
+  periodEnd      String   @default("")
+  notes          String   @default("")
+  loadLines      Json     @default("[]")
+  recurringLines Json     @default("[]")
+  loadsSubtotal  Float    @default(0)
+  recurringTotal Float    @default(0)
+  netTotal       Float    @default(0)
+  createdAt      DateTime @default(now())
+
+  trucker Trucker @relation(fields: [truckerId], references: [id], onDelete: Cascade)
+  loads   Load[]
+
+  @@index([truckerId])
+}
