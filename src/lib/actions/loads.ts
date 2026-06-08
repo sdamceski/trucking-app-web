@@ -13,7 +13,11 @@ import type { LoadStatus } from '@/lib/types';
 import { requireAdmin, requireTrucker } from '@/lib/auth/dal';
 
 const VALID_STATUS = new Set<string>(LOAD_STATUSES);
-const TRUCKER_ALLOWED_STATUS = new Set<LoadStatus>(['picked_up', 'delivered']);
+const TRUCKER_ALLOWED_STATUS = new Set<LoadStatus>([
+  'assigned',
+  'picked_up',
+  'delivered',
+]);
 
 function s(v: FormDataEntryValue | null): string {
   return typeof v === 'string' ? v.trim() : '';
@@ -79,7 +83,7 @@ export async function setLoadStatus(id: string, status: LoadStatus) {
 export async function setMyLoadStatus(id: string, status: LoadStatus, date?: string) {
   const session = await requireTrucker();
   if (!TRUCKER_ALLOWED_STATUS.has(status)) {
-    throw new Error('Truckers can only set status to picked up or delivered');
+    throw new Error('Status not allowed');
   }
   const load = await getLoad(id);
   if (!load || load.truckerId !== session.truckerId) {
@@ -87,8 +91,15 @@ export async function setMyLoadStatus(id: string, status: LoadStatus, date?: str
   }
   const patch: Record<string, unknown> = { status };
   const stamp = (date ?? '').trim() || new Date().toISOString().slice(0, 10);
-  if (status === 'picked_up') patch.pickedUpAt = stamp;
-  if (status === 'delivered') patch.deliveredAt = stamp;
+  if (status === 'picked_up') {
+    patch.pickedUpAt = stamp;
+    patch.deliveredAt = '';
+  } else if (status === 'delivered') {
+    patch.deliveredAt = stamp;
+  } else if (status === 'assigned') {
+    patch.pickedUpAt = '';
+    patch.deliveredAt = '';
+  }
   await storeUpdateLoad(id, patch);
   revalidatePath('/my');
   revalidatePath(`/my/loads/${id}`);

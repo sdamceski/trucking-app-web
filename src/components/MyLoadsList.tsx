@@ -66,13 +66,25 @@ function LoadCard({ load }: { load: MyLoad }) {
   const [pending, start] = useTransition();
   const [date, setDate] = useState<string>(today());
 
-  function update(status: LoadStatus) {
-    const stamp = date || today();
+  function update(status: LoadStatus, stampOverride?: string) {
+    const stamp = stampOverride ?? (date || today());
     start(() => {
       setMyLoadStatus(load.id, status, stamp).catch((e: unknown) => {
         if (typeof window !== 'undefined') alert((e as Error).message);
       });
     });
+  }
+
+  function clearStatus() {
+    const prompt =
+      load.status === 'delivered'
+        ? 'Clear the delivered date and move this load back to picked up?'
+        : 'Clear the pickup date and move this load back to assigned?';
+    if (!confirm(prompt)) return;
+    const revertTo: LoadStatus = load.status === 'delivered' ? 'picked_up' : 'assigned';
+    // Empty date string keeps the previous pickup stamp when reverting delivery → picked_up;
+    // server clears both timestamps when reverting to assigned.
+    update(revertTo, load.status === 'delivered' ? load.pickedUpAt || today() : '');
   }
 
   const nextStatus: LoadStatus | null =
@@ -172,9 +184,29 @@ function LoadCard({ load }: { load: MyLoad }) {
                 ? 'Mark picked up'
                 : 'Mark delivered'}
           </button>
+          {load.status === 'picked_up' ? (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={clearStatus}
+              className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-60"
+            >
+              Clear picked up
+            </button>
+          ) : null}
         </div>
       ) : (
-        <div className="mt-4 text-sm text-emerald-700">✓ Delivered</div>
+        <div className="mt-4 flex items-center gap-3 text-sm text-emerald-700">
+          <span>✓ Delivered</span>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={clearStatus}
+            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-60"
+          >
+            Clear delivered
+          </button>
+        </div>
       )}
     </li>
   );
